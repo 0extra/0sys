@@ -12,10 +12,12 @@ from zerosys.cli.commands import (
     rollback,
     tips,
 )
+from zerosys.cli.commands.cloud_init import cloud_init_command
 
 __all__ = [
     "apply",
     "check",
+    "cloud_init_command",
     "doctor",
     "examples",
     "explain",

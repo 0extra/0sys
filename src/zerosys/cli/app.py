@@ -11,6 +11,9 @@ from zerosys.cli.commands import (
     check as check_cmd,
 )
 from zerosys.cli.commands import (
+    cloud_init_command,
+)
+from zerosys.cli.commands import (
     doctor as doctor_cmd,
 )
 from zerosys.cli.commands import (
@@ -56,6 +59,10 @@ app.add_typer(explain_cmd.app, name="explain", help="Explain a configuration in 
 app.add_typer(init_cmd.app, name="init", help="Create a starter configuration file")
 app.add_typer(explain_term_cmd.app, name="explain-term", help="Explain a technical term")
 app.add_typer(tips_cmd.app, name="tips", help="Show practical tips")
+app.command(
+    "cloud-init",
+    help="Generate cloud-init user-data for a VPS provider",
+)(cloud_init_command)
 
 
 def _version_callback(value: bool) -> None:
