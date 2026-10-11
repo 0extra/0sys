@@ -7,6 +7,7 @@ import yaml
 from pydantic import ValidationError
 
 from zerosys.core.config.schema import Config
+from zerosys.core.config.validator import validate
 from zerosys.core.errors import (
     ConfigNotFoundError,
     ConfigParseError,
@@ -26,7 +27,9 @@ def load_config(path: Path | str) -> Config:
     except OSError as exc:
         raise ConfigParseError(f"cannot read config file: {exc}") from exc
 
-    return parse_config(raw_text)
+    config = parse_config(raw_text)
+    _raise_on_semantic_errors(config)
+    return config
 
 
 def parse_config(raw_text: str) -> Config:
@@ -52,6 +55,17 @@ def build_config(data: dict[str, Any]) -> Config:
         return Config.model_validate(data)
     except ValidationError as exc:
         raise ConfigValidationError(_format_validation_error(exc)) from exc
+
+
+def _raise_on_semantic_errors(config: Config) -> None:
+    report = validate(config)
+    if not report.has_errors:
+        return
+    lines = ["config validation failed:"]
+    for issue in report.errors():
+        location = f" [{issue.path}]" if issue.path else ""
+        lines.append(f"  - {issue.code}{location}: {issue.message}")
+    raise ConfigValidationError("\n".join(lines))
 
 
 def _format_validation_error(exc: ValidationError) -> str:

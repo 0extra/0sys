@@ -146,4 +146,4 @@ def package_list_for_os(os_id: str) -> list[str]:
 
 
 def config_to_dict(config: Config) -> dict[str, Any]:
-    return config.model_dump(exclude_none=True)
+    return config.model_dump(exclude_unset=True, exclude_none=True)
