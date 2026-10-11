@@ -1,0 +1,11 @@
+---
+- name: Update package cache
+  ansible.builtin.package:
+    update_cache: true
+  changed_when: false
+
+- name: Install requested packages
+  ansible.builtin.package:
+    name: "{{ packages_install }}"
+    state: present
+  when: packages_install is defined and packages_install | length > 0

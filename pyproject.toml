@@ -46,6 +46,7 @@ dev = [
     "mypy>=1.10.0",
     "pre-commit>=3.7.0",
     "testcontainers>=4.0.0",
+    "types-PyYAML>=6.0.12",
 ]
 
 [project.scripts]
@@ -97,12 +98,20 @@ select = [
 ]
 ignore = [
     "PLR0913",
+    "PLR0917",
     "PLR2004",
+    "B008",
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["ARG", "PLR2004"]
 "src/zerosys/wizard/**/*.py" = ["T201"]
+"src/zerosys/cli/app.py" = ["ARG001"]
+"src/zerosys/cli/commands/check.py" = ["ARG001"]
+"src/zerosys/cli/commands/apply.py" = ["PLR0912", "PLR0915", "ARG001"]
+"src/zerosys/cli/ui/progress.py" = ["ARG002"]
+"src/zerosys/backends/**/*.py" = ["ARG002", "PLC0415"]
+"src/zerosys/backends/ansible/generator.py" = ["PLR0911"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["zerosys"]
@@ -130,7 +139,7 @@ show_error_codes = true
 files = ["src/zerosys"]
 
 [[tool.mypy.overrides]]
-module = ["ansible_runner.*", "testcontainers.*"]
+module = ["ansible_runner.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

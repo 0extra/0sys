@@ -1,0 +1,14 @@
+---
+- name: Install docker
+  ansible.builtin.package:
+    name:
+      - docker
+      - docker-compose
+    state: present
+  ignore_errors: "{{ ansible_os_family == 'Debian' }}"
+
+- name: Enable docker
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true

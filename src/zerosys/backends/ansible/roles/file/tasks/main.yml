@@ -1,0 +1,8 @@
+---
+- name: Upload file
+  ansible.builtin.copy:
+    src: "{{ file_src }}"
+    dest: "{{ file_dest }}"
+    owner: "{{ file_owner }}"
+    group: "{{ file_group }}"
+    mode: "{{ file_mode }}"

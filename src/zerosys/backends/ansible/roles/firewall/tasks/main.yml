@@ -1,0 +1,59 @@
+---
+- name: Install firewall packages
+  ansible.builtin.package:
+    name:
+      - ufw
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Install firewall packages
+  ansible.builtin.package:
+    name:
+      - firewalld
+    state: present
+  when: ansible_os_family == "RedHat"
+
+- name: Set default deny policy
+  community.general.ufw:
+    policy: "{{ firewall_default }}"
+    direction: incoming
+  when:
+    - ansible_os_family == "Debian"
+    - firewall_default == "deny"
+
+- name: Set default allow policy
+  community.general.ufw:
+    policy: "{{ firewall_default }}"
+    direction: incoming
+  when:
+    - ansible_os_family == "Debian"
+    - firewall_default == "allow"
+
+- name: Allow listed ports
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop: "{{ firewall_allow }}"
+  when: ansible_os_family == "Debian"
+
+- name: Enable ufw
+  community.general.ufw:
+    state: enabled
+  when: ansible_os_family == "Debian"
+
+- name: Allow listed ports
+  ansible.posix.firewalld:
+    port: "{{ item }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+  loop: "{{ firewall_allow }}"
+  when: ansible_os_family == "RedHat"
+
+- name: Enable firewalld
+  ansible.builtin.service:
+    name: firewalld
+    state: started
+    enabled: true
+  when: ansible_os_family == "RedHat"

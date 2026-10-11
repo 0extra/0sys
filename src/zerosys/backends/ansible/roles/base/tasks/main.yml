@@ -1,0 +1,16 @@
+---
+- name: Set hostname
+  ansible.builtin.hostname:
+    name: "{{ server_hostname }}"
+  when: server_hostname is defined and server_hostname | length > 0
+
+- name: Set timezone
+  community.general.timezone:
+    name: "{{ server_timezone }}"
+  when: server_timezone is defined and server_timezone | length > 0
+
+- name: Set locale
+  ansible.builtin.locale_gen:
+    name: "{{ server_locale }}"
+    state: present
+  when: server_locale is defined and server_locale | length > 0
