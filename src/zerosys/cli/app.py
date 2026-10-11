@@ -20,6 +20,9 @@ from zerosys.cli.commands import (
     explain as explain_cmd,
 )
 from zerosys.cli.commands import (
+    explain_term as explain_term_cmd,
+)
+from zerosys.cli.commands import (
     init as init_cmd,
 )
 from zerosys.cli.commands import (
@@ -27,6 +30,9 @@ from zerosys.cli.commands import (
 )
 from zerosys.cli.commands import (
     rollback as rollback_cmd,
+)
+from zerosys.cli.commands import (
+    tips as tips_cmd,
 )
 from zerosys.cli.ui.banner import print_banner, print_mini_banner
 from zerosys.cli.ui.theme import build_console
@@ -48,6 +54,8 @@ app.add_typer(doctor_cmd.app, name="doctor", help="Check environment for missing
 app.add_typer(examples_cmd.app, name="examples", help="Show example configurations")
 app.add_typer(explain_cmd.app, name="explain", help="Explain a configuration in plain English")
 app.add_typer(init_cmd.app, name="init", help="Create a starter configuration file")
+app.add_typer(explain_term_cmd.app, name="explain-term", help="Explain a technical term")
+app.add_typer(tips_cmd.app, name="tips", help="Show practical tips")
 
 
 def _version_callback(value: bool) -> None:

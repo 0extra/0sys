@@ -6,9 +6,11 @@ from zerosys.cli.commands import (
     doctor,
     examples,
     explain,
+    explain_term,
     init,
     plan,
     rollback,
+    tips,
 )
 
 __all__ = [
@@ -17,7 +19,9 @@ __all__ = [
     "doctor",
     "examples",
     "explain",
+    "explain_term",
     "init",
     "plan",
     "rollback",
+    "tips",
 ]
