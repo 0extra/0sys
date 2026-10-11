@@ -64,7 +64,7 @@ def _format_validation_error(exc: ValidationError) -> str:
 
 
 def dump_config(config: Config) -> str:
-    data = config.model_dump(exclude_none=True, exclude_defaults=False)
+    data = config.model_dump(exclude_unset=True, exclude_none=True)
     result = yaml.safe_dump(
         data,
         sort_keys=False,

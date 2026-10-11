@@ -105,7 +105,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["ARG", "PLR2004"]
-"src/zerosys/wizard/**/*.py" = ["T201"]
+"src/zerosys/wizard/**/*.py" = ["T201", "ARG002"]
 "src/zerosys/cli/app.py" = ["ARG001"]
 "src/zerosys/cli/commands/check.py" = ["ARG001"]
 "src/zerosys/cli/commands/apply.py" = ["PLR0912", "PLR0915", "ARG001"]

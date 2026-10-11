@@ -12,6 +12,7 @@ from zerosys.core.config import (
     web_server_config,
     write_config,
 )
+from zerosys.wizard import run_wizard
 
 app = typer.Typer(help="Create a starter configuration file")
 
@@ -24,11 +25,28 @@ PRESETS = {
 
 @app.callback(invoke_without_command=True)
 def run(
-    preset: str = typer.Option("minimal", "--preset", help="Preset name: minimal, web, docker"),
-    output: Path = typer.Option(Path(DEFAULT_CONFIG_FILENAME), "--output", "-o"),
-    hostname: str | None = typer.Option(None, "--hostname"),
+    preset: str | None = typer.Option(
+        None,
+        "--preset",
+        help="Skip the wizard and use a preset: minimal, web, docker",
+    ),
+    output: Path = typer.Option(
+        Path(DEFAULT_CONFIG_FILENAME),
+        "--output",
+        "-o",
+        help="Where to write the config",
+    ),
+    hostname: str | None = typer.Option(
+        None,
+        "--hostname",
+        help="Hostname (only used with --preset)",
+    ),
 ) -> None:
     console = get_console()
+
+    if preset is None:
+        run_wizard(output=output)
+        return
 
     if preset not in PRESETS:
         console.print(f"[error]Unknown preset '{preset}'. Choose: {', '.join(PRESETS)}[/error]")
@@ -37,4 +55,4 @@ def run(
     cfg = PRESETS[preset](hostname=hostname)
     path = write_config(cfg, output)
     console.print(f"[success]Wrote {path}[/success]")
-    console.print("[hint]Run: 0sys plan " + str(output) + "[/hint]")
+    console.print(f"[hint]Run: 0sys plan {path}[/hint]")

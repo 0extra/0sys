@@ -9,13 +9,17 @@ from zerosys.core.planner.task import Task
 class DependencyGraph:
     def __init__(self) -> None:
         self._nodes: dict[str, Task] = {}
+        self._order: dict[str, int] = {}
         self._forward: dict[str, set[str]] = defaultdict(set)
         self._backward: dict[str, set[str]] = defaultdict(set)
+        self._next_order = 0
 
     def add_task(self, task: Task) -> None:
         if task.id in self._nodes:
             raise PlannerError(f"task with id '{task.id}' already exists")
         self._nodes[task.id] = task
+        self._order[task.id] = self._next_order
+        self._next_order += 1
         self._forward.setdefault(task.id, set())
         self._backward.setdefault(task.id, set())
 
@@ -58,24 +62,33 @@ class DependencyGraph:
     def dependents_of(self, task_id: str) -> set[str]:
         return set(self._forward.get(task_id, set()))
 
+    def _ordered(self, ids: set[str] | list[str]) -> list[str]:
+        return sorted(ids, key=lambda nid: self._order[nid])
+
     def roots(self) -> list[Task]:
-        return [self._nodes[nid] for nid, deps in self._backward.items() if not deps]
+        ids = [nid for nid, deps in self._backward.items() if not deps]
+        return [self._nodes[nid] for nid in self._ordered(ids)]
 
     def leaves(self) -> list[Task]:
-        return [self._nodes[nid] for nid, deps in self._forward.items() if not deps]
+        ids = [nid for nid, deps in self._forward.items() if not deps]
+        return [self._nodes[nid] for nid in self._ordered(ids)]
 
     def topological_order(self) -> list[Task]:
         in_degree = {nid: len(self._backward[nid]) for nid in self._nodes}
-        queue: deque[str] = deque(sorted(nid for nid, deg in in_degree.items() if deg == 0))
+        ready = [nid for nid in self._nodes if in_degree[nid] == 0]
+        queue: deque[str] = deque(self._ordered(ready))
         ordered: list[Task] = []
 
         while queue:
             nid = queue.popleft()
             ordered.append(self._nodes[nid])
-            for dependent in sorted(self._forward[nid]):
+            newly_ready: list[str] = []
+            for dependent in self._forward[nid]:
                 in_degree[dependent] -= 1
                 if in_degree[dependent] == 0:
-                    queue.append(dependent)
+                    newly_ready.append(dependent)
+            for nid2 in self._ordered(newly_ready):
+                queue.append(nid2)
 
         if len(ordered) != len(self._nodes):
             cycle = self._find_cycle()
@@ -85,18 +98,18 @@ class DependencyGraph:
 
     def levels(self) -> list[list[Task]]:
         in_degree = {nid: len(self._backward[nid]) for nid in self._nodes}
-        current = sorted(nid for nid, deg in in_degree.items() if deg == 0)
+        current = self._ordered([nid for nid in self._nodes if in_degree[nid] == 0])
         result: list[list[Task]] = []
 
         while current:
             result.append([self._nodes[nid] for nid in current])
             next_level: list[str] = []
             for nid in current:
-                for dependent in sorted(self._forward[nid]):
+                for dependent in self._forward[nid]:
                     in_degree[dependent] -= 1
                     if in_degree[dependent] == 0:
                         next_level.append(dependent)
-            current = next_level
+            current = self._ordered(next_level)
 
         if sum(len(level) for level in result) != len(self._nodes):
             cycle = self._find_cycle()
@@ -113,7 +126,7 @@ class DependencyGraph:
             visited.add(node)
             stack.append(node)
             on_stack.add(node)
-            for neighbor in sorted(self._forward[node]):
+            for neighbor in self._ordered(list(self._forward[node])):
                 if neighbor not in visited:
                     cycle = dfs(neighbor)
                     if cycle:
@@ -125,7 +138,7 @@ class DependencyGraph:
             on_stack.discard(node)
             return None
 
-        for nid in self._nodes:
+        for nid in self._ordered(list(self._nodes)):
             if nid not in visited:
                 cycle = dfs(nid)
                 if cycle:
