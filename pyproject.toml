@@ -1,0 +1,171 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "zerosys"
+version = "0.1.0"
+description = "A friendly server automation tool for beginner sysadmins"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+    { name = "0extra", email = "0extra@proton.me" }
+]
+requires-python = ">=3.11"
+keywords = ["sysadmin", "automation", "server", "ansible", "devops", "beginner"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Systems Administration",
+]
+
+dependencies = [
+    "typer>=0.12.0",
+    "rich>=13.7.0",
+    "pydantic>=2.6.0",
+    "pyyaml>=6.0.1",
+    "jinja2>=3.1.3",
+    "ansible-runner>=2.3.6",
+    "tomli-w>=1.0.0",
+    "platformdirs>=4.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "ruff>=0.4.0",
+    "mypy>=1.10.0",
+    "pre-commit>=3.7.0",
+    "testcontainers>=4.0.0",
+]
+
+[project.scripts]
+zerosys = "zerosys.cli.app:main"
+0sys = "zerosys.cli.app:main"
+
+[project.urls]
+Homepage = "https://github.com/0extra/0sys"
+Repository = "https://github.com/0extra/0sys"
+Issues = "https://github.com/0extra/0sys/issues"
+Changelog = "https://github.com/0extra/0sys/blob/main/CHANGELOG.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/zerosys"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/zerosys",
+    "tests",
+    "docs",
+    "examples",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "W",
+    "I",
+    "N",
+    "UP",
+    "B",
+    "C4",
+    "SIM",
+    "RET",
+    "ARG",
+    "PTH",
+    "ERA",
+    "PL",
+    "RUF",
+]
+ignore = [
+    "PLR0913",
+    "PLR2004",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["ARG", "PLR2004"]
+"src/zerosys/wizard/**/*.py" = ["T201"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["zerosys"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+show_error_codes = true
+files = ["src/zerosys"]
+
+[[tool.mypy.overrides]]
+module = ["ansible_runner.*", "testcontainers.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--verbose",
+    "--cov=zerosys",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+]
+markers = [
+    "unit: unit tests",
+    "integration: integration tests",
+    "e2e: end-to-end tests",
+    "slow: slow tests",
+]
+
+[tool.coverage.run]
+source = ["src/zerosys"]
+branch = true
+omit = [
+    "*/tests/*",
+    "*/__main__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
