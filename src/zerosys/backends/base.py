@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
-from zerosys.core.planner.task import Task, TaskResult
+from zerosys.core.planner.task import Task, TaskResult, TaskStatus
 
 
 class BackendContext:
@@ -48,6 +48,16 @@ class Backend(ABC):
 
     def check(self, task: Task, context: BackendContext) -> TaskResult:
         return TaskResult(status=task.status, changed=False)
+
+    def can_rollback(self, task: Task) -> bool:
+        return False
+
+    def rollback(self, task: Task, context: BackendContext) -> TaskResult:
+        return TaskResult(
+            status=TaskStatus.SKIPPED,
+            message=f"backend '{self.name}' does not support rollback",
+            changed=False,
+        )
 
     def explain(self, task: Task) -> str:
         return task.explain or self.description

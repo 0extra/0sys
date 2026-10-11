@@ -15,6 +15,9 @@ class CloudInitBackend(Backend):
     def __init__(self) -> None:
         self.generator = CloudInitGenerator()
 
+    def can_rollback(self, task: Task) -> bool:
+        return False
+
     def supports(self, task: Task) -> bool:
         return False
 

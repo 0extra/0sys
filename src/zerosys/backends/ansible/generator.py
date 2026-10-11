@@ -89,6 +89,84 @@ class PlaybookGenerator:
             }
         return {}
 
+    def build_rollback_playbook(
+        self,
+        tasks: list[Task],
+        host_pattern: str = "all",
+    ) -> list[dict[str, Any]]:
+        entries: list[dict[str, Any]] = []
+        for task in reversed(tasks):
+            entry = self._task_to_rollback_entry(task)
+            if entry is not None:
+                entries.append(entry)
+        if not entries:
+            return []
+        return [
+            {
+                "name": "0sys rollback playbook",
+                "hosts": host_pattern,
+                "gather_facts": False,
+                "become": True,
+                "tasks": entries,
+            }
+        ]
+
+    def _task_to_rollback_entry(self, task: Task) -> dict[str, Any] | None:
+        if task.kind is TaskKind.FILE:
+            return self._rollback_file(task)
+        if task.kind is TaskKind.USER:
+            return self._rollback_user(task)
+        if task.kind is TaskKind.SERVICE:
+            return self._rollback_service(task)
+        if task.kind is TaskKind.PACKAGES_INSTALL:
+            return self._rollback_packages(task)
+        return None
+
+    def _rollback_file(self, task: Task) -> dict[str, Any]:
+        dest = task.params.get("dest")
+        return {
+            "name": f"Remove file {dest}",
+            "ansible.builtin.file": {
+                "path": dest,
+                "state": "absent",
+            },
+            "tags": ["rollback", task.kind.value],
+        }
+
+    def _rollback_user(self, task: Task) -> dict[str, Any]:
+        name = task.params.get("name")
+        return {
+            "name": f"Remove user {name}",
+            "ansible.builtin.user": {
+                "name": name,
+                "state": "absent",
+                "remove": True,
+            },
+            "tags": ["rollback", task.kind.value],
+        }
+
+    def _rollback_service(self, task: Task) -> dict[str, Any]:
+        name = task.params.get("name")
+        return {
+            "name": f"Stop service {name}",
+            "ansible.builtin.service": {
+                "name": name,
+                "state": "stopped",
+            },
+            "tags": ["rollback", task.kind.value],
+        }
+
+    def _rollback_packages(self, task: Task) -> dict[str, Any]:
+        packages = task.params.get("packages", [])
+        return {
+            "name": f"Remove packages {packages}",
+            "ansible.builtin.package": {
+                "name": packages,
+                "state": "absent",
+            },
+            "tags": ["rollback", task.kind.value],
+        }
+
     def _task_to_inline_entry(self, task: Task) -> dict[str, Any]:
         if task.kind is TaskKind.PACKAGES_REMOVE:
             return {

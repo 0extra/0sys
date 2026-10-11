@@ -15,6 +15,9 @@ class NixosBackend(Backend):
     def __init__(self) -> None:
         self.generator = NixosGenerator()
 
+    def can_rollback(self, task: Task) -> bool:
+        return False
+
     def supports(self, task: Task) -> bool:
         return False
 

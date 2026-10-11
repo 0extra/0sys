@@ -13,6 +13,7 @@ from zerosys.cli.commands import (
 from zerosys.cli.commands import (
     cloud_init_command,
     nixos_command,
+    rollback_command,
     terraform_command,
 )
 from zerosys.cli.commands import (
@@ -34,9 +35,6 @@ from zerosys.cli.commands import (
     plan as plan_cmd,
 )
 from zerosys.cli.commands import (
-    rollback as rollback_cmd,
-)
-from zerosys.cli.commands import (
     tips as tips_cmd,
 )
 from zerosys.cli.ui.banner import print_banner, print_mini_banner
@@ -54,7 +52,6 @@ app = typer.Typer(
 app.add_typer(plan_cmd.app, name="plan", help="Show what 0sys would do")
 app.add_typer(apply_cmd.app, name="apply", help="Apply a configuration")
 app.add_typer(check_cmd.app, name="check", help="Dry-run a configuration")
-app.add_typer(rollback_cmd.app, name="rollback", help="Inspect or roll back a previous run")
 app.add_typer(doctor_cmd.app, name="doctor", help="Check environment for missing pieces")
 app.add_typer(examples_cmd.app, name="examples", help="Show example configurations")
 app.add_typer(explain_cmd.app, name="explain", help="Explain a configuration in plain English")
@@ -73,6 +70,10 @@ app.command(
     "nixos",
     help="Generate a NixOS configuration.nix from the config",
 )(nixos_command)
+app.command(
+    "rollback",
+    help="Inspect past runs and roll back safe operations",
+)(rollback_command)
 
 
 def _version_callback(value: bool) -> None:

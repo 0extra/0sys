@@ -9,11 +9,11 @@ from zerosys.cli.commands import (
     explain_term,
     init,
     plan,
-    rollback,
     tips,
 )
 from zerosys.cli.commands.cloud_init import cloud_init_command
 from zerosys.cli.commands.nixos import nixos_command
+from zerosys.cli.commands.rollback import rollback_command
 from zerosys.cli.commands.terraform import terraform_command
 
 __all__ = [
@@ -27,7 +27,7 @@ __all__ = [
     "init",
     "nixos_command",
     "plan",
-    "rollback",
+    "rollback_command",
     "terraform_command",
     "tips",
 ]

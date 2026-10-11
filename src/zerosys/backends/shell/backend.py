@@ -13,6 +13,9 @@ class ShellBackend(Backend):
     def supports(self, task: Task) -> bool:
         return task.kind is TaskKind.COMMAND
 
+    def can_rollback(self, task: Task) -> bool:
+        return False
+
     def run(self, task: Task, context: BackendContext) -> TaskResult:
         if not self.supports(task):
             raise BackendError(f"shell backend does not support task kind '{task.kind.value}'")

@@ -1,48 +1,103 @@
 from __future__ import annotations
 
-from zerosys.backends.registry import get_backend, load_default_backends
+from dataclasses import dataclass, field
+
+from zerosys.backends.base import Backend
+from zerosys.backends.registry import get_backend
 from zerosys.core.errors import RollbackError
 from zerosys.core.executor.context import ExecutionContext
 from zerosys.core.executor.state import ExecutionState
 from zerosys.core.planner.task import Task, TaskResult, TaskStatus
 
 
+@dataclass
+class RollbackOptions:
+    aggressive: bool = False
+    stop_on_failure: bool = True
+
+
+@dataclass
+class RollbackReport:
+    attempted: int = 0
+    successful: int = 0
+    failed: int = 0
+    skipped: int = 0
+    not_reversible: list[str] = field(default_factory=list)
+    reversed_tasks: list[Task] = field(default_factory=list)
+    failed_tasks: list[Task] = field(default_factory=list)
+
+    def summary(self) -> str:
+        return (
+            f"{self.successful} rolled back, {self.failed} failed, "
+            f"{self.skipped} skipped, {len(self.not_reversible)} not reversible"
+        )
+
+
 class Rollbacker:
-    def __init__(self, context: ExecutionContext, state: ExecutionState) -> None:
+    def __init__(
+        self,
+        context: ExecutionContext,
+        state: ExecutionState,
+        options: RollbackOptions | None = None,
+    ) -> None:
         self.context = context
         self.state = state
-        load_default_backends()
+        self.options = options or RollbackOptions()
 
-    def rollback(self) -> ExecutionState:
+    def rollback(self) -> RollbackReport:
+        report = RollbackReport()
         ordered = list(reversed(self.state.executed_tasks))
+
         for task in ordered:
             if not task.idempotent:
                 continue
-            self._rollback_task(task)
-        return self.state
+            backend = self._backend_for(task)
+            if backend is None:
+                report.not_reversible.append(task.name)
+                continue
+            if not backend.can_rollback(task):
+                report.not_reversible.append(task.name)
+                continue
+            if task.kind.value == "packages.install" and not self.options.aggressive:
+                report.not_reversible.append(task.name)
+                continue
 
-    def _rollback_task(self, task: Task) -> None:
+            report.attempted += 1
+            result = self._attempt_rollback(task, backend)
+            if result.status is TaskStatus.SUCCESS:
+                report.successful += 1
+                report.reversed_tasks.append(task)
+                task.mark_rolled_back(result.message)
+                self.state.register_rollback(task)
+            elif result.status is TaskStatus.SKIPPED:
+                report.skipped += 1
+            else:
+                report.failed += 1
+                report.failed_tasks.append(task)
+                task.mark_failed(result)
+                if self.options.stop_on_failure:
+                    break
+
+        return report
+
+    def _backend_for(self, task: Task) -> Backend | None:
         if task.backend is None:
-            raise RollbackError(f"task '{task.name}' has no backend assigned")
-        backend = get_backend(task.backend)
+            return None
         try:
-            result = (
-                backend.rollback(task, self.context.backend_context)
-                if hasattr(backend, "rollback")
-                else None
-            )
+            return get_backend(task.backend)
+        except Exception:
+            return None
+
+    def _attempt_rollback(self, task: Task, backend: Backend) -> TaskResult:
+        try:
+            return backend.rollback(task, self.context.backend_context)
         except Exception as exc:
             raise RollbackError(f"rollback failed for '{task.name}': {exc}") from exc
 
-        if result is None:
-            result = TaskResult(
-                status=TaskStatus.ROLLED_BACK,
-                message="no rollback available for this backend",
-            )
 
-        task.mark_rolled_back(result.message)
-        self.state.register_rollback(task)
-
-
-def rollback(context: ExecutionContext, state: ExecutionState) -> ExecutionState:
-    return Rollbacker(context, state).rollback()
+def rollback(
+    context: ExecutionContext,
+    state: ExecutionState,
+    options: RollbackOptions | None = None,
+) -> RollbackReport:
+    return Rollbacker(context, state, options).rollback()
