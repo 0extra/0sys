@@ -1,0 +1,27 @@
+version: 1
+
+server:
+  hostname: ci-runner-01
+  timezone: UTC
+
+packages:
+  install:
+    - docker
+    - docker-compose
+    - git
+    - ufw
+
+services:
+  docker:
+    state: started
+    enabled: true
+
+users:
+  - name: runner
+    groups: [docker]
+    shell: /bin/bash
+    sudo: false
+
+firewall:
+  default: deny
+  allow: [22]

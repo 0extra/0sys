@@ -1,0 +1,25 @@
+version: 1
+
+server:
+  hostname: dev-01
+  timezone: UTC
+
+packages:
+  install:
+    - git
+    - curl
+    - vim
+    - tmux
+    - htop
+    - build-essential
+    - python3-pip
+
+users:
+  - name: dev
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: true
+
+firewall:
+  default: allow
+  allow: [22]

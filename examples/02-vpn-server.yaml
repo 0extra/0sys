@@ -1,0 +1,25 @@
+version: 1
+
+server:
+  hostname: vpn-01
+  timezone: UTC
+
+packages:
+  install:
+    - wireguard
+    - ufw
+    - fail2ban
+
+services:
+  wg-quick@wg0:
+    state: started
+    enabled: true
+
+firewall:
+  default: deny
+  allow: [22, 51820]
+
+commands:
+  - name: enable-ip-forwarding
+    run: sysctl -w net.ipv4.ip_forward=1
+    when: once

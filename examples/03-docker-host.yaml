@@ -1,0 +1,27 @@
+version: 1
+
+server:
+  hostname: docker-01
+  timezone: UTC
+
+packages:
+  install:
+    - docker
+    - docker-compose
+    - ufw
+    - fail2ban
+
+services:
+  docker:
+    state: started
+    enabled: true
+
+users:
+  - name: deploy
+    groups: [sudo, docker]
+    shell: /bin/bash
+    sudo: true
+
+firewall:
+  default: deny
+  allow: [22]

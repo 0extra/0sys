@@ -1,0 +1,31 @@
+version: 1
+
+server:
+  hostname: web-01
+  timezone: UTC
+  locale: en_US.UTF-8
+
+packages:
+  install:
+    - nginx
+    - ufw
+    - fail2ban
+    - certbot
+
+services:
+  nginx:
+    state: started
+    enabled: true
+  fail2ban:
+    state: started
+    enabled: true
+
+firewall:
+  default: deny
+  allow: [22, 80, 443]
+
+users:
+  - name: admin
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: true
