@@ -1,0 +1,35 @@
+first_server:
+  - Set up SSH keys before disabling password login.
+  - Keep port 22 open until you confirm your new user can log in.
+  - Take a snapshot of the VPS before applying big changes.
+  - Write down what you did. Future you will thank present you.
+
+firewall:
+  - Always keep port 22 open on a remote server, or you will lock yourself out.
+  - Test new firewall rules in a separate SSH session before closing the old one.
+  - '"deny by default" is safer than "allow by default".'
+
+ssh:
+  - Use ed25519 keys. They are shorter and stronger than RSA.
+  - Never share your private key. Only the .pub file goes to the server.
+  - Disable root login once your admin user works.
+
+packages:
+  - Update the package cache before installing anything.
+  - Remove unused packages. Less software, fewer bugs.
+  - Prefer distribution packages over random scripts from the internet.
+
+docker:
+  - Add your user to the docker group so you do not need sudo for every command.
+  - Containers are not virtual machines. They share the host kernel.
+  - Back up volumes. Container contents disappear on rebuild.
+
+backups:
+  - A backup you have never restored from is not a backup.
+  - Store backups off the server. If the server dies, local backups die with it.
+  - Test restore once a month.
+
+security:
+  - Turn on automatic security updates if your distribution supports it.
+  - Read logs once a week. Look for repeated login failures.
+  - If you do not use a port, close it.

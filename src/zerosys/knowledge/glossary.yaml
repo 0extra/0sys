@@ -1,0 +1,77 @@
+ssh:
+  term: SSH (Secure Shell)
+  simple: A way to log in to another computer over the internet safely.
+  why: Without SSH you would have to sit in front of the server.
+  example: "0sys connects to your server with SSH on port 22."
+
+ssh_key:
+  term: SSH key
+  simple: A pair of files that prove who you are, without a password.
+  why: Passwords can be guessed. SSH keys cannot.
+  example: "Your private key stays on your laptop, the public key goes to the server."
+
+firewall:
+  term: Firewall
+  simple: A guard that decides which doors on your server are open.
+  why: Without it, anyone on the internet can knock on any door.
+  example: "0sys closes everything except SSH by default."
+
+ufw:
+  term: UFW (Uncomplicated Firewall)
+  simple: A simple way to manage firewall rules on Ubuntu and Debian.
+  why: Raw firewall rules are scary. UFW makes them readable.
+  example: "0sys uses ufw to allow port 22 and 80."
+
+fail2ban:
+  term: fail2ban
+  simple: A program that watches logs and blocks IPs that keep trying to break in.
+  why: Stops brute-force attacks cheaply.
+  example: "After 5 failed logins, fail2ban blocks the IP for 10 minutes."
+
+nginx:
+  term: nginx
+  simple: A web server. It answers when someone visits your site.
+  why: Fast, small, easy to configure. The default choice for most sites.
+  example: "0sys installs nginx and opens ports 80 and 443."
+
+docker:
+  term: Docker
+  simple: Runs applications in isolated boxes called containers.
+  why: Each app gets its own environment. No dependency conflicts.
+  example: "0sys installs docker and docker-compose when you pick the docker preset."
+
+systemd:
+  term: systemd
+  simple: The program that starts services when your server boots.
+  why: Without it you would start everything by hand.
+  example: "0sys tells systemd to keep nginx running."
+
+port:
+  term: Port
+  simple: A numbered door on your server. Each service listens on one.
+  why: SSH is 22, HTTP is 80, HTTPS is 443.
+  example: "If port 443 is closed, nobody can reach your site over HTTPS."
+
+hostname:
+  term: Hostname
+  simple: The name your server calls itself.
+  why: Shows up in logs and prompts. Helps you know which machine you are on.
+  example: "0sys sets the hostname to web-01 so logs are readable."
+
+sudo:
+  term: sudo
+  simple: Permission to run commands as administrator.
+  why: Needed to install packages and change system files.
+  example: "0sys adds your admin user to the sudo group."
+
+playbook:
+  term: Ansible playbook
+  simple: A file that describes what should be done on a server.
+  why: 0sys generates these from your config.
+  example: "You do not need to write playbooks. 0sys does it for you."
+
+idempotent:
+  term: Idempotent
+  simple: Running it twice gives the same result as running it once.
+  why: Safe to re-apply. No surprise duplicates.
+  example: "0sys only installs nginx if it is not already installed."
