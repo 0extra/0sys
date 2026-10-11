@@ -1,0 +1,80 @@
+- name: Install Docker packages (Debian)
+  ansible.builtin.package:
+    name:
+      - docker.io
+      - docker-compose-plugin
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Install Docker packages (RedHat)
+  ansible.builtin.package:
+    name:
+      - docker
+      - docker-compose-plugin
+    state: present
+  when: ansible_os_family == "RedHat"
+
+- name: Install Docker packages (Arch)
+  ansible.builtin.package:
+    name:
+      - docker
+      - docker-compose
+    state: present
+  when: ansible_os_family == "Archlinux"
+
+- name: Enable Docker
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Create install directory
+  ansible.builtin.file:
+    path: "{{ proxy_install_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Clone 0TPE repository
+  ansible.builtin.git:
+    repo: "{{ proxy_repo_url }}"
+    dest: "{{ proxy_install_dir }}"
+    version: "v{{ proxy_version }}"
+    update: false
+    force: false
+
+- name: Check CA certificate presence
+  ansible.builtin.stat:
+    path: "{{ proxy_install_dir }}/certs/ca.crt"
+  register: proxy_ca_check
+
+- name: Generate certificates
+  ansible.builtin.command:
+    cmd: ./scripts/gen_ca.sh
+    chdir: "{{ proxy_install_dir }}"
+    creates: "{{ proxy_install_dir }}/certs/ca.crt"
+  when: not proxy_ca_check.stat.exists
+
+- name: Deploy server config
+  ansible.builtin.template:
+    src: 0tpe.conf.j2
+    dest: "{{ proxy_install_dir }}/0tpe.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart 0tpe
+
+- name: Build 0TPE image
+  community.docker.docker_compose_v2:
+    project_src: "{{ proxy_install_dir }}"
+    build: always
+    state: present
+  register: proxy_build
+  changed_when: "'BUILD' in (proxy_build.stdout | default(''))"
+
+- name: Ensure 0TPE is running
+  community.docker.docker_compose_v2:
+    project_src: "{{ proxy_install_dir }}"
+    state: present
+    recreate: auto

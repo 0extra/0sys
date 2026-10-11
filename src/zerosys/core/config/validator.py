@@ -78,6 +78,7 @@ def validate(config: Config) -> ValidationReport:
     _check_files(config, report)
     _check_commands(config, report)
     _check_server(config, report)
+    _check_proxy_port(config, report)
 
     return report
 
@@ -239,5 +240,26 @@ def _check_server(config: Config, report: ValidationReport) -> None:
                 code="SRV001",
                 message="server hostname is not set; the default hostname will be kept",
                 path="server.hostname",
+            )
+        )
+
+
+def _check_proxy_port(config: Config, report: ValidationReport) -> None:
+    if config.proxy is None or not config.proxy.enabled:
+        return
+    if config.firewall is None:
+        return
+    if config.firewall.default != "deny":
+        return
+    if config.proxy.port not in config.firewall.allow:
+        report.add(
+            ValidationIssue(
+                severity=Severity.WARNING,
+                code="PROXY001",
+                message=(
+                    f"proxy is enabled and uses port {config.proxy.port}, "
+                    f"but firewall does not allow it; clients will not connect"
+                ),
+                path="proxy.port",
             )
         )

@@ -17,6 +17,7 @@ ANSIBLE_KINDS: frozenset[TaskKind] = frozenset(
         TaskKind.USER,
         TaskKind.FIREWALL,
         TaskKind.FILE,
+        TaskKind.PROXY,
     }
 )
 

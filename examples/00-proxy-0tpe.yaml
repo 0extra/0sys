@@ -1,0 +1,23 @@
+version: 1
+
+server:
+  hostname: proxy-01
+  timezone: UTC
+
+packages:
+  install:
+    - ufw
+    - fail2ban
+
+proxy:
+  enabled: true
+  runtime: docker
+  port: 8443
+  sni: www.microsoft.com
+  max_connections: 512
+  log_level: info
+  version: "0.1.5"
+
+firewall:
+  default: deny
+  allow: [22, 8443]

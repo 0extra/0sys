@@ -17,6 +17,7 @@ class TaskKind(StrEnum):
     FIREWALL = "firewall"
     FILE = "file"
     COMMAND = "command"
+    PROXY = "proxy"
 
 
 class TaskStatus(StrEnum):

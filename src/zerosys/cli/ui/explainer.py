@@ -15,6 +15,7 @@ TASK_KIND_LABELS: dict[str, str] = {
     "firewall": "Firewall",
     "file": "Upload file",
     "command": "Run command",
+    "proxy": "Deploy 0TPE proxy",
 }
 
 

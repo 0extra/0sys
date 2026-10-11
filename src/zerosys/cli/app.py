@@ -13,6 +13,9 @@ from zerosys.cli.commands import (
 from zerosys.cli.commands import (
     cloud_init_command,
     nixos_command,
+    proxy_client_config_command,
+    proxy_server_info_command,
+    proxy_show_config_command,
     rollback_command,
     terraform_command,
 )
@@ -48,6 +51,15 @@ app = typer.Typer(
     rich_markup_mode="rich",
 )
 
+proxy_app = typer.Typer(help="Manage the 0TPE proxy server")
+proxy_app.command("server-info", help="Show proxy server details from state")(
+    proxy_server_info_command
+)
+proxy_app.command("client-config", help="Generate a client config file")(
+    proxy_client_config_command
+)
+proxy_app.command("show-config", help="Show reconstructed server config")(proxy_show_config_command)
+
 
 app.add_typer(plan_cmd.app, name="plan", help="Show what 0sys would do")
 app.add_typer(apply_cmd.app, name="apply", help="Apply a configuration")
@@ -58,6 +70,7 @@ app.add_typer(explain_cmd.app, name="explain", help="Explain a configuration in 
 app.add_typer(init_cmd.app, name="init", help="Create a starter configuration file")
 app.add_typer(explain_term_cmd.app, name="explain-term", help="Explain a technical term")
 app.add_typer(tips_cmd.app, name="tips", help="Show practical tips")
+app.add_typer(proxy_app, name="0tpe", help="0TPE proxy server helpers")
 app.command(
     "cloud-init",
     help="Generate cloud-init user-data for a VPS provider",

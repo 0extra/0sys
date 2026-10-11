@@ -1,0 +1,8 @@
+listen_ip       = 0.0.0.0
+listen_port     = {{ proxy_port }}
+max_connections = {{ proxy_max_connections }}
+cert_file       = certs/server.crt
+key_file        = certs/server.key
+ca_file         = certs/ca.crt
+fallback_sni    = {{ proxy_sni }}
+log_level       = {{ proxy_log_level }}

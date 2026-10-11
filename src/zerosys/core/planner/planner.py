@@ -65,19 +65,24 @@ class Planner:
         for task in file_tasks:
             graph.add_task(task)
 
+        proxy_task = self._make_proxy_task(config)
+        if proxy_task is not None:
+            graph.add_task(proxy_task)
+
         command_tasks = self._make_command_tasks(config)
         for task in command_tasks:
             graph.add_task(task)
 
-        self._wire_dependencies(
-            graph=graph,
-            server_task=server_task,
-            package_tasks=package_tasks,
-            firewall_task=firewall_task,
-            user_tasks=user_tasks,
-            service_tasks=service_tasks,
-            file_tasks=file_tasks,
+        install_task = next(
+            (t for t in package_tasks if t.kind is TaskKind.PACKAGES_INSTALL),
+            None,
         )
+
+        self._wire_firewall(graph, firewall_task, install_task, server_task)
+        self._wire_users(graph, user_tasks, firewall_task)
+        self._wire_services(graph, service_tasks, firewall_task)
+        self._wire_files(graph, file_tasks, service_tasks)
+        self._wire_proxy(graph, proxy_task, install_task, firewall_task)
 
         graph.link_declared_dependencies()
         return Plan(graph, self.resolver)
@@ -244,6 +249,36 @@ class Planner:
             )
         return tasks
 
+    def _make_proxy_task(self, config: Config) -> Task | None:
+        if config.proxy is None or not config.proxy.enabled:
+            return None
+
+        params: dict[str, object] = {
+            "port": config.proxy.port,
+            "sni": config.proxy.sni,
+            "max_connections": config.proxy.max_connections,
+            "log_level": config.proxy.log_level,
+            "version": config.proxy.version,
+            "install_dir": config.proxy.install_dir,
+            "runtime": config.proxy.runtime,
+        }
+        if config.proxy.ssh_keys:
+            params["ssh_keys"] = list(config.proxy.ssh_keys)
+
+        return Task(
+            kind=TaskKind.PROXY,
+            name="configure_proxy",
+            description="Deploy 0TPE proxy server",
+            explain=(
+                "Builds and starts the 0TPE proxy in Docker. "
+                "Traffic from clients looks like HTTPS to the fallback SNI. "
+                "Use '0sys 0tpe client-config' to generate a client config file."
+            ),
+            params=params,
+            idempotent=True,
+            critical=True,
+        )
+
     def _make_command_tasks(self, config: Config) -> list[Task]:
         tasks: list[Task] = []
         for entry in config.commands:
@@ -263,41 +298,68 @@ class Planner:
             )
         return tasks
 
-    def _wire_dependencies(
+    def _wire_firewall(
         self,
-        *,
         graph: DependencyGraph,
-        server_task: Task | None,
-        package_tasks: list[Task],
         firewall_task: Task | None,
-        user_tasks: list[Task],
-        service_tasks: list[Task],
-        file_tasks: list[Task],
+        install_task: Task | None,
+        server_task: Task | None,
     ) -> None:
-        install_task = next(
-            (t for t in package_tasks if t.kind is TaskKind.PACKAGES_INSTALL),
-            None,
-        )
+        if firewall_task is None:
+            return
+        if install_task is not None:
+            graph.add_dependency(firewall_task.id, install_task.id)
+        elif server_task is not None:
+            graph.add_dependency(firewall_task.id, server_task.id)
 
-        if firewall_task is not None:
-            if install_task is not None:
-                graph.add_dependency(firewall_task.id, install_task.id)
-            elif server_task is not None:
-                graph.add_dependency(firewall_task.id, server_task.id)
+    def _wire_users(
+        self,
+        graph: DependencyGraph,
+        user_tasks: list[Task],
+        firewall_task: Task | None,
+    ) -> None:
+        if not user_tasks or firewall_task is None:
+            return
+        for task in user_tasks:
+            graph.add_dependency(task.id, firewall_task.id)
 
-        if user_tasks and firewall_task is not None:
-            for task in user_tasks:
-                graph.add_dependency(task.id, firewall_task.id)
+    def _wire_services(
+        self,
+        graph: DependencyGraph,
+        service_tasks: list[Task],
+        firewall_task: Task | None,
+    ) -> None:
+        if not service_tasks or firewall_task is None:
+            return
+        for task in service_tasks:
+            graph.add_dependency(task.id, firewall_task.id)
 
-        if service_tasks and firewall_task is not None:
-            for task in service_tasks:
-                graph.add_dependency(task.id, firewall_task.id)
+    def _wire_files(
+        self,
+        graph: DependencyGraph,
+        file_tasks: list[Task],
+        service_tasks: list[Task],
+    ) -> None:
+        if not file_tasks or not service_tasks:
+            return
+        for task in file_tasks:
+            for service in service_tasks:
+                if service.target and service.target in task.name:
+                    graph.add_dependency(task.id, service.id)
 
-        if file_tasks and service_tasks:
-            for task in file_tasks:
-                for service in service_tasks:
-                    if service.target and service.target in task.name:
-                        graph.add_dependency(task.id, service.id)
+    def _wire_proxy(
+        self,
+        graph: DependencyGraph,
+        proxy_task: Task | None,
+        install_task: Task | None,
+        firewall_task: Task | None,
+    ) -> None:
+        if proxy_task is None:
+            return
+        if install_task is not None:
+            graph.add_dependency(proxy_task.id, install_task.id)
+        elif firewall_task is not None:
+            graph.add_dependency(proxy_task.id, firewall_task.id)
 
 
 def build_plan(config: Config, forced_backend: str | None = None) -> Plan:

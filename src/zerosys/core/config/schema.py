@@ -112,6 +112,29 @@ class InfrastructureConfig(BaseModel):
         return list(dict.fromkeys(v))
 
 
+ProxyRuntime = Literal["docker"]
+ProxyLogLevel = Literal["debug", "info", "warn", "error"]
+
+
+class ProxyConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    enabled: bool = False
+    runtime: ProxyRuntime = "docker"
+    port: Annotated[int, Field(ge=1, le=65535)] = 8443
+    sni: Annotated[str, Field(min_length=1, max_length=253)] = "www.microsoft.com"
+    max_connections: Annotated[int, Field(ge=1, le=65535)] = 512
+    log_level: ProxyLogLevel = "info"
+    version: str = "0.1.5"
+    install_dir: str = "/opt/0tpe"
+    ssh_keys: list[str] = Field(default_factory=list)
+
+    @field_validator("ssh_keys")
+    @classmethod
+    def _deduplicate(cls, v: list[str]) -> list[str]:
+        return list(dict.fromkeys(v))
+
+
 class FileEntry(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
@@ -147,6 +170,7 @@ class Config(BaseModel):
     users: list[UserConfig] = Field(default_factory=list)
     firewall: FirewallConfig | None = None
     infrastructure: InfrastructureConfig | None = None
+    proxy: ProxyConfig | None = None
     files: list[FileEntry] = Field(default_factory=list)
     commands: list[CommandEntry] = Field(default_factory=list)
 
