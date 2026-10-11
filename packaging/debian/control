@@ -1,0 +1,27 @@
+Source: zerosys
+Section: admin
+Priority: optional
+Maintainer: 0extra <zaro.to.extra@gmail.com>
+Build-Depends: debhelper-compat (= 13), python3, python3-pip, python3-venv, python3-all
+Standards-Version: 4.6.2
+Homepage: https://github.com/0extra/0sys
+Vcs-Git: https://github.com/0extra/0sys.git
+Vcs-Browser: https://github.com/0extra/0sys
+Rules-Requires-Root: no
+
+Package: zerosys
+Architecture: all
+Depends: ${misc:Depends}, python3 (>= 3.11), python3-yaml, python3-jinja2
+Recommends: ansible-core, openssh-client
+Description: Friendly server automation for beginner sysadmins
+ 0sys helps people who are just starting their journey as system
+ administrators. Write a simple YAML configuration file and 0sys
+ picks the right tool and does the work for you.
+ .
+ Features:
+  - Interactive wizard for guided setup
+  - Ansible backend with reusable roles
+  - Cloud-init generator for VPS providers
+  - SSH and local connection support
+  - Audit log with secret redaction
+  - Built-in knowledge base with explanations and tips
