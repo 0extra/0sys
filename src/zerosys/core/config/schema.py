@@ -92,6 +92,26 @@ class FirewallConfig(BaseModel):
         return sorted(set(v))
 
 
+InfrastructureProvider = Literal["hetzner", "digitalocean"]
+
+
+class InfrastructureConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    provider: InfrastructureProvider
+    region: Annotated[str, Field(min_length=1, max_length=64)]
+    server_type: Annotated[str, Field(min_length=1, max_length=64)]
+    image: str = "ubuntu-24.04"
+    name: Annotated[str, Field(min_length=1, max_length=64)] | None = None
+    ssh_keys: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+
+    @field_validator("ssh_keys", "tags")
+    @classmethod
+    def _deduplicate(cls, v: list[str]) -> list[str]:
+        return list(dict.fromkeys(v))
+
+
 class FileEntry(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
@@ -126,6 +146,7 @@ class Config(BaseModel):
     services: dict[str, ServiceConfig] = Field(default_factory=dict)
     users: list[UserConfig] = Field(default_factory=list)
     firewall: FirewallConfig | None = None
+    infrastructure: InfrastructureConfig | None = None
     files: list[FileEntry] = Field(default_factory=list)
     commands: list[CommandEntry] = Field(default_factory=list)
 

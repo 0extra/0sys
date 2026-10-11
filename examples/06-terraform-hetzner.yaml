@@ -1,0 +1,25 @@
+version: 1
+
+server:
+  hostname: web-01
+
+infrastructure:
+  provider: hetzner
+  region: nbg1
+  server_type: cx22
+  image: ubuntu-24.04
+  ssh_keys:
+    - my-key
+  tags:
+    - env:prod
+    - owner:admin
+
+packages:
+  install:
+    - nginx
+    - ufw
+    - fail2ban
+
+firewall:
+  default: deny
+  allow: [22, 80, 443]

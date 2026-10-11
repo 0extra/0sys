@@ -1,0 +1,28 @@
+version: 1
+
+server:
+  hostname: nixos-01
+  timezone: UTC
+  locale: en_US.UTF-8
+
+packages:
+  install:
+    - curl
+    - git
+    - vim
+    - htop
+
+services:
+  nginx:
+    state: started
+    enabled: true
+
+users:
+  - name: admin
+    groups: [wheel]
+    shell: /bin/bash
+    sudo: true
+
+firewall:
+  default: deny
+  allow: [22, 80, 443]

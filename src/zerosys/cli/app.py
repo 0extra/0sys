@@ -12,6 +12,8 @@ from zerosys.cli.commands import (
 )
 from zerosys.cli.commands import (
     cloud_init_command,
+    nixos_command,
+    terraform_command,
 )
 from zerosys.cli.commands import (
     doctor as doctor_cmd,
@@ -63,6 +65,14 @@ app.command(
     "cloud-init",
     help="Generate cloud-init user-data for a VPS provider",
 )(cloud_init_command)
+app.command(
+    "terraform",
+    help="Generate Terraform HCL to create infrastructure",
+)(terraform_command)
+app.command(
+    "nixos",
+    help="Generate a NixOS configuration.nix from the config",
+)(nixos_command)
 
 
 def _version_callback(value: bool) -> None:
