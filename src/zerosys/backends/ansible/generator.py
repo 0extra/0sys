@@ -173,6 +173,7 @@ class PlaybookGenerator:
                 "proxy_max_connections": task.params.get("max_connections", 512),
                 "proxy_log_level": task.params.get("log_level", "info"),
                 "proxy_version": task.params.get("version", "0.1.5"),
+                "proxy_commit_sha": task.params.get("commit_sha", ""),
                 "proxy_install_dir": task.params.get("install_dir", "/opt/0tpe"),
             }
         return {}

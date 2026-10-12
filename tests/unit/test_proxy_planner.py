@@ -104,3 +104,25 @@ def test_validator_no_warning_when_port_allowed() -> None:
 
     codes = {i.code for i in report.issues}
     assert "PROXY001" not in codes
+
+
+def test_proxy_task_carries_commit_sha() -> None:
+    config = Config(
+        version=CONFIG_VERSION,
+        proxy=ProxyConfig(enabled=True, commit_sha="a1b2c3d4e5f6"),
+    )
+    plan = build_plan(config)
+    proxy = next(t for t in plan.tasks() if t.kind is TaskKind.PROXY)
+
+    assert proxy.params["commit_sha"] == "a1b2c3d4e5f6"
+
+
+def test_proxy_task_omits_commit_sha_when_none() -> None:
+    config = Config(
+        version=CONFIG_VERSION,
+        proxy=ProxyConfig(enabled=True),
+    )
+    plan = build_plan(config)
+    proxy = next(t for t in plan.tasks() if t.kind is TaskKind.PROXY)
+
+    assert "commit_sha" not in proxy.params

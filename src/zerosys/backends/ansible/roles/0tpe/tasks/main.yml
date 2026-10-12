@@ -1,3 +1,18 @@
+- name: Check that community.docker collection is available
+  ansible.builtin.command:
+    cmd: ansible-galaxy collection list community.docker
+  register: proxy_collection_check
+  changed_when: false
+  failed_when: false
+
+- name: Fail with helpful message if community.docker is missing
+  ansible.builtin.fail:
+    msg: |
+      The 'community.docker' Ansible collection is required for the 0TPE role.
+      Install it with:
+        ansible-galaxy collection install community.docker
+  when: proxy_collection_check.rc != 0
+
 - name: Install Docker packages (Debian)
   ansible.builtin.package:
     name:
@@ -28,21 +43,70 @@
     state: started
     enabled: true
 
+- name: Create proxy system group
+  ansible.builtin.group:
+    name: "{{ proxy_group }}"
+    system: true
+    state: present
+
+- name: Create proxy system user
+  ansible.builtin.user:
+    name: "{{ proxy_user }}"
+    group: "{{ proxy_group }}"
+    shell: "{{ proxy_user_shell }}"
+    home: "{{ proxy_user_home }}"
+    create_home: true
+    system: true
+    state: present
+
+- name: Add proxy user to docker group
+  ansible.builtin.user:
+    name: "{{ proxy_user }}"
+    groups: docker
+    append: true
+
 - name: Create install directory
   ansible.builtin.file:
     path: "{{ proxy_install_dir }}"
     state: directory
-    owner: root
-    group: root
-    mode: "0755"
+    owner: "{{ proxy_user }}"
+    group: "{{ proxy_group }}"
+    mode: "0750"
+
+- name: Check if repository is already cloned
+  ansible.builtin.stat:
+    path: "{{ proxy_install_dir }}/.git"
+  register: proxy_repo_check
 
 - name: Clone 0TPE repository
   ansible.builtin.git:
     repo: "{{ proxy_repo_url }}"
     dest: "{{ proxy_install_dir }}"
-    version: "v{{ proxy_version }}"
+    version: "{{ proxy_commit_sha if proxy_commit_sha else 'v' + proxy_version }}"
     update: false
     force: false
+  become: true
+  become_user: "{{ proxy_user }}"
+  when: not proxy_repo_check.stat.exists
+
+- name: Verify repository is at expected revision
+  ansible.builtin.command:
+    cmd: "git rev-parse HEAD"
+    chdir: "{{ proxy_install_dir }}"
+  register: proxy_head
+  changed_when: false
+  become: true
+  become_user: "{{ proxy_user }}"
+
+- name: Fail if commit SHA mismatch
+  ansible.builtin.fail:
+    msg: |
+      Repository HEAD is {{ proxy_head.stdout }},
+      expected {{ proxy_commit_sha }}.
+      Delete {{ proxy_install_dir }} and re-apply to re-clone.
+  when:
+    - proxy_commit_sha | length > 0
+    - not proxy_head.stdout.startswith(proxy_commit_sha)
 
 - name: Check CA certificate presence
   ansible.builtin.stat:
@@ -54,15 +118,26 @@
     cmd: ./scripts/gen_ca.sh
     chdir: "{{ proxy_install_dir }}"
     creates: "{{ proxy_install_dir }}/certs/ca.crt"
+  become: true
+  become_user: "{{ proxy_user }}"
+  when: not proxy_ca_check.stat.exists
+
+- name: Fix certificates ownership
+  ansible.builtin.file:
+    path: "{{ proxy_install_dir }}/certs"
+    owner: "{{ proxy_user }}"
+    group: "{{ proxy_group }}"
+    mode: "0700"
+    recurse: true
   when: not proxy_ca_check.stat.exists
 
 - name: Deploy server config
   ansible.builtin.template:
     src: 0tpe.conf.j2
     dest: "{{ proxy_install_dir }}/0tpe.conf"
-    owner: root
-    group: root
-    mode: "0644"
+    owner: "{{ proxy_user }}"
+    group: "{{ proxy_group }}"
+    mode: "0640"
   notify: restart 0tpe
 
 - name: Build 0TPE image
@@ -70,6 +145,8 @@
     project_src: "{{ proxy_install_dir }}"
     build: always
     state: present
+  become: true
+  become_user: "{{ proxy_user }}"
   register: proxy_build
   changed_when: "'BUILD' in (proxy_build.stdout | default(''))"
 
@@ -78,3 +155,5 @@
     project_src: "{{ proxy_install_dir }}"
     state: present
     recreate: auto
+  become: true
+  become_user: "{{ proxy_user }}"

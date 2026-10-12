@@ -262,6 +262,8 @@ class Planner:
             "install_dir": config.proxy.install_dir,
             "runtime": config.proxy.runtime,
         }
+        if config.proxy.commit_sha:
+            params["commit_sha"] = config.proxy.commit_sha
         if config.proxy.ssh_keys:
             params["ssh_keys"] = list(config.proxy.ssh_keys)
 

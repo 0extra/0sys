@@ -14,6 +14,7 @@ from zerosys.cli.commands import (
     cloud_init_command,
     nixos_command,
     proxy_client_config_command,
+    proxy_fetch_certs_command,
     proxy_server_info_command,
     proxy_show_config_command,
     rollback_command,
@@ -52,13 +53,22 @@ app = typer.Typer(
 )
 
 proxy_app = typer.Typer(help="Manage the 0TPE proxy server")
-proxy_app.command("server-info", help="Show proxy server details from state")(
-    proxy_server_info_command
-)
-proxy_app.command("client-config", help="Generate a client config file")(
-    proxy_client_config_command
-)
-proxy_app.command("show-config", help="Show reconstructed server config")(proxy_show_config_command)
+proxy_app.command(
+    "server-info",
+    help="Show proxy server details from state",
+)(proxy_server_info_command)
+proxy_app.command(
+    "client-config",
+    help="Generate a client config file",
+)(proxy_client_config_command)
+proxy_app.command(
+    "show-config",
+    help="Show reconstructed server config",
+)(proxy_show_config_command)
+proxy_app.command(
+    "fetch-certs",
+    help="Download certificates from the server",
+)(proxy_fetch_certs_command)
 
 
 app.add_typer(plan_cmd.app, name="plan", help="Show what 0sys would do")

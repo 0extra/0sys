@@ -53,3 +53,37 @@ def test_proxy_deduplicates_ssh_keys() -> None:
 def test_proxy_unknown_field_raises() -> None:
     with pytest.raises(ValidationError):
         ProxyConfig(unknown="x")  # type: ignore[call-arg]
+
+
+def test_proxy_commit_sha_default_is_none() -> None:
+    proxy = ProxyConfig()
+
+    assert proxy.commit_sha is None
+
+
+def test_proxy_commit_sha_accepts_hex() -> None:
+    proxy = ProxyConfig(commit_sha="a1b2c3d4e5f6a7b8")
+
+    assert proxy.commit_sha == "a1b2c3d4e5f6a7b8"
+
+
+def test_proxy_commit_sha_lowercases() -> None:
+    proxy = ProxyConfig(commit_sha="A1B2C3D4E5")
+
+    assert proxy.commit_sha == "a1b2c3d4e5"
+
+
+def test_proxy_commit_sha_rejects_non_hex() -> None:
+    with pytest.raises(ValidationError, match="hexadecimal"):
+        ProxyConfig(commit_sha="xyz1234")
+
+
+def test_proxy_commit_sha_rejects_too_short() -> None:
+    with pytest.raises(ValidationError, match="7 characters"):
+        ProxyConfig(commit_sha="a1b2c3")
+
+
+def test_proxy_commit_sha_empty_becomes_none() -> None:
+    proxy = ProxyConfig(commit_sha="   ")
+
+    assert proxy.commit_sha is None

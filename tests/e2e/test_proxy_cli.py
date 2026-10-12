@@ -161,3 +161,10 @@ def test_proxy_help_lists_subcommands(runner: CliRunner) -> None:
     assert "server-info" in result.stdout
     assert "client-config" in result.stdout
     assert "show-config" in result.stdout
+
+
+def test_proxy_help_lists_fetch_certs(runner: CliRunner) -> None:
+    result = runner.invoke(app, ["0tpe", "--help"])
+
+    assert result.exit_code == 0
+    assert "fetch-certs" in result.stdout

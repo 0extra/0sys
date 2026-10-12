@@ -15,6 +15,7 @@ from zerosys.cli.commands.cloud_init import cloud_init_command
 from zerosys.cli.commands.nixos import nixos_command
 from zerosys.cli.commands.proxy import (
     proxy_client_config_command,
+    proxy_fetch_certs_command,
     proxy_server_info_command,
     proxy_show_config_command,
 )
@@ -33,6 +34,7 @@ __all__ = [
     "nixos_command",
     "plan",
     "proxy_client_config_command",
+    "proxy_fetch_certs_command",
     "proxy_server_info_command",
     "proxy_show_config_command",
     "rollback_command",

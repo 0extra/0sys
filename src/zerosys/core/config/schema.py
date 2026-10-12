@@ -123,8 +123,23 @@ class ProxyConfig(BaseModel):
     max_connections: Annotated[int, Field(ge=1, le=65535)] = 512
     log_level: ProxyLogLevel = "info"
     version: str = "0.1.5"
+    commit_sha: str | None = None
     install_dir: str = "/opt/0tpe"
     ssh_keys: list[str] = Field(default_factory=list)
+
+    @field_validator("commit_sha")
+    @classmethod
+    def _validate_commit_sha(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        stripped = v.strip()
+        if not stripped:
+            return None
+        if not all(c in "0123456789abcdef" for c in stripped.lower()):
+            raise ValueError("commit_sha must be a hexadecimal SHA hash")
+        if len(stripped) < 7:
+            raise ValueError("commit_sha must be at least 7 characters")
+        return stripped.lower()
 
     @field_validator("ssh_keys")
     @classmethod
