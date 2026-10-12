@@ -1,11 +1,17 @@
 ---
-- name: Update package cache
-  ansible.builtin.package:
+- name: Update package cache (Debian)
+  ansible.builtin.apt:
     update_cache: true
-  changed_when: false
+    cache_valid_time: 3600
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: Update package cache (RedHat)
+  ansible.builtin.dnf:
+    update_cache: true
+  when: ansible_facts['os_family'] == "RedHat"
 
 - name: Install requested packages
   ansible.builtin.package:
     name: "{{ packages_install }}"
     state: present
-  when: packages_install is defined and packages_install | length > 0
+  when: (packages_install | default([], true)) | length > 0

@@ -15,6 +15,22 @@ ANSIBLE_ROLE_BY_KIND: dict[TaskKind, str] = {
     TaskKind.PROXY: "0tpe",
 }
 
+PYTHON_BOOTSTRAP_COMMAND = (
+    "if ! command -v python3 >/dev/null 2>&1; then "
+    "  if command -v apk >/dev/null 2>&1; then "
+    "    apk add --no-cache python3; "
+    "  elif command -v apt-get >/dev/null 2>&1; then "
+    "    apt-get update && apt-get install -y python3-minimal; "
+    "  elif command -v dnf >/dev/null 2>&1; then "
+    "    dnf install -y python3; "
+    "  elif command -v yum >/dev/null 2>&1; then "
+    "    yum install -y python3; "
+    "  elif command -v pacman >/dev/null 2>&1; then "
+    "    pacman -Sy --noconfirm python; "
+    "  fi; "
+    "fi"
+)
+
 
 class PlaybookGenerator:
     def __init__(self, roles_dir: str = "roles") -> None:
@@ -24,8 +40,21 @@ class PlaybookGenerator:
         return {
             "name": "0sys generated playbook",
             "hosts": host_pattern,
-            "gather_facts": True,
+            "gather_facts": False,
             "become": True,
+            "pre_tasks": [
+                {
+                    "name": "Ensure Python is available on the target",
+                    "ansible.builtin.raw": PYTHON_BOOTSTRAP_COMMAND,
+                    "changed_when": False,
+                    "tags": ["always"],
+                },
+                {
+                    "name": "Gather facts after Python bootstrap",
+                    "ansible.builtin.setup": {},
+                    "tags": ["always"],
+                },
+            ],
             "tasks": [self._task_to_play_entry(task) for task in tasks],
         }
 
@@ -50,6 +79,14 @@ class PlaybookGenerator:
                 "hosts": host_pattern,
                 "gather_facts": False,
                 "become": True,
+                "pre_tasks": [
+                    {
+                        "name": "Ensure Python is available on the target",
+                        "ansible.builtin.raw": PYTHON_BOOTSTRAP_COMMAND,
+                        "changed_when": False,
+                        "tags": ["always"],
+                    },
+                ],
                 "tasks": entries,
             }
         ]
@@ -124,7 +161,9 @@ class PlaybookGenerator:
     def _task_to_role_entry(self, task: Task, role_name: str) -> dict[str, Any]:
         return {
             "name": task.description or task.name,
-            "role": role_name,
+            "ansible.builtin.import_role": {
+                "name": role_name,
+            },
             "vars": self._role_vars(task, role_name),
             "tags": [task.kind.value, *task.tags],
         }

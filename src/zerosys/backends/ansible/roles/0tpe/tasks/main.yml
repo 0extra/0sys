@@ -19,7 +19,7 @@
       - docker.io
       - docker-compose-plugin
     state: present
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: Install Docker packages (RedHat)
   ansible.builtin.package:
@@ -27,7 +27,7 @@
       - docker
       - docker-compose-plugin
     state: present
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts['os_family'] == "RedHat"
 
 - name: Install Docker packages (Arch)
   ansible.builtin.package:
@@ -35,7 +35,7 @@
       - docker
       - docker-compose
     state: present
-  when: ansible_os_family == "Archlinux"
+  when: ansible_facts['os_family'] == "Archlinux"
 
 - name: Enable Docker
   ansible.builtin.service:
@@ -82,7 +82,7 @@
   ansible.builtin.git:
     repo: "{{ proxy_repo_url }}"
     dest: "{{ proxy_install_dir }}"
-    version: "{{ proxy_commit_sha if proxy_commit_sha else 'v' + proxy_version }}"
+    version: "{{ proxy_commit_sha if (proxy_commit_sha | default('', true)) | length > 0 else 'v' + proxy_version }}"
     update: false
     force: false
   become: true
@@ -105,7 +105,7 @@
       expected {{ proxy_commit_sha }}.
       Delete {{ proxy_install_dir }} and re-apply to re-clone.
   when:
-    - proxy_commit_sha | length > 0
+    - (proxy_commit_sha | default('', true)) | length > 0
     - not proxy_head.stdout.startswith(proxy_commit_sha)
 
 - name: Check CA certificate presence

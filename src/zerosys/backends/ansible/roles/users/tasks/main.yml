@@ -1,4 +1,22 @@
 ---
+- name: Install sudo on Debian
+  ansible.builtin.package:
+    name: sudo
+    state: present
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: Install sudo on RedHat
+  ansible.builtin.package:
+    name: sudo
+    state: present
+  when: ansible_facts['os_family'] == "RedHat"
+
+- name: Install sudo on Alpine
+  community.general.apk:
+    name: sudo
+    state: present
+  when: ansible_facts['os_family'] == "Alpine"
+
 - name: Create user
   ansible.builtin.user:
     name: "{{ user_name }}"
@@ -16,11 +34,11 @@
     group: root
     mode: "0440"
     validate: "visudo -cf %s"
-  when: user_sudo | bool
+  when: user_sudo | default(false) | bool
 
 - name: Install SSH key
   ansible.posix.authorized_key:
     user: "{{ user_name }}"
     key: "{{ user_ssh_key }}"
     state: present
-  when: user_ssh_key is defined and user_ssh_key | length > 0
+  when: (user_ssh_key | default('', true)) | length > 0

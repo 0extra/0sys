@@ -1,4 +1,8 @@
 ---
+- name: End role early inside containers
+  ansible.builtin.meta: end_role
+  when: ansible_facts['virtualization_type'] in ["docker", "container", "lxc", "podman"]
+
 - name: Upload service config file
   ansible.builtin.copy:
     src: "{{ service_config_file }}"
@@ -6,7 +10,7 @@
     owner: root
     group: root
     mode: "0644"
-  when: service_config_file is defined and service_config_file | length > 0
+  when: (service_config_file | default('', true)) | length > 0
   notify: "restart {{ service_name }}"
 
 - name: Ensure service state

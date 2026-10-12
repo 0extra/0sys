@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -56,18 +57,20 @@ class AnsibleRunner:
 
         with tempfile.TemporaryDirectory(prefix="0sys-ansible-") as tmp:
             project_dir = Path(tmp)
-            self._write_inventory(project_dir)
             self._write_playbook(project_dir, playbook)
+            self._copy_roles(project_dir)
             self._write_env(project_dir)
 
             env_vars: dict[str, str] = {}
             if self.ssh_key:
                 env_vars["ANSIBLE_PRIVATE_KEY_FILE"] = self.ssh_key
+            if self.roles_path and self.roles_path.exists():
+                env_vars["ANSIBLE_ROLES_PATH"] = str(self.roles_path)
 
             result = ansible_runner.run(
                 private_data_dir=str(project_dir),
                 playbook="playbook.yml",
-                inventory="inventory.ini",
+                inventory=self._build_inventory(),
                 extravars=extra_vars or {},
                 tags=",".join(tags) if tags else None,
                 envvars=env_vars,
@@ -77,24 +80,32 @@ class AnsibleRunner:
 
             return self._convert(result)
 
-    def _write_inventory(self, project_dir: Path) -> None:
-        host_line = self.inventory_host
+    def _build_inventory(self) -> dict[str, Any]:
+        host_vars: dict[str, Any] = {}
         if self.inventory_user:
-            host_line = f"{self.inventory_host}"
-        lines = ["[all]"]
-        entry = host_line
-        options: list[str] = []
-        if self.inventory_user:
-            options.append(f"ansible_user={self.inventory_user}")
+            host_vars["ansible_user"] = self.inventory_user
         if self.inventory_port != 22:
-            options.append(f"ansible_port={self.inventory_port}")
+            host_vars["ansible_port"] = self.inventory_port
         if self.ssh_key:
-            options.append(f"ansible_ssh_private_key_file={self.ssh_key}")
-        options.append("ansible_python_interpreter=/usr/bin/python3")
-        if options:
-            entry = f"{host_line} " + " ".join(options)
-        lines.append(entry)
-        (project_dir / "inventory.ini").write_text("\n".join(lines) + "\n", encoding="utf-8")
+            host_vars["ansible_ssh_private_key_file"] = self.ssh_key
+        host_vars["ansible_python_interpreter"] = "auto_silent"
+        host_vars["ansible_ssh_common_args"] = (
+            "-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null"
+        )
+
+        return {
+            "all": {
+                "hosts": {
+                    self.inventory_host: host_vars,
+                }
+            }
+        }
+
+    def _copy_roles(self, project_dir: Path) -> None:
+        if self.roles_path is None or not self.roles_path.exists():
+            return
+        target = project_dir / "roles"
+        shutil.copytree(self.roles_path, target, dirs_exist_ok=True)
 
     def _write_playbook(self, project_dir: Path, playbook: list[dict[str, Any]]) -> None:
         content = yaml.safe_dump(playbook, sort_keys=False, allow_unicode=True)
@@ -103,13 +114,13 @@ class AnsibleRunner:
     def _write_env(self, project_dir: Path) -> None:
         env_dir = project_dir / "env"
         env_dir.mkdir(parents=True, exist_ok=True)
-        settings = {
+        settings: dict[str, Any] = {
             "host_key_checking": False,
             "retry_files_enabled": False,
             "stdout_callback": "default",
             "gathering": "smart",
         }
-        if self.roles_path:
+        if self.roles_path and self.roles_path.exists():
             settings["roles_path"] = str(self.roles_path)
         (env_dir / "settings").write_text(json.dumps(settings, indent=2), encoding="utf-8")
 
