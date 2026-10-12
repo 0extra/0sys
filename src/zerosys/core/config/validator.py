@@ -83,18 +83,25 @@ def validate(config: Config) -> ValidationReport:
     return report
 
 
+def _resolve_ssh_port(config: Config) -> int:
+    if config.server is not None and config.server.ssh_port:
+        return config.server.ssh_port
+    return SSH_DEFAULT_PORT
+
+
 def _check_firewall_ssh_lockout(config: Config, report: ValidationReport) -> None:
     if config.firewall is None:
         return
     if config.firewall.default == "allow":
         return
-    if SSH_DEFAULT_PORT not in config.firewall.allow:
+    ssh_port = _resolve_ssh_port(config)
+    if ssh_port not in config.firewall.allow:
         report.add(
             ValidationIssue(
                 severity=Severity.ERROR,
                 code="FW001",
                 message=(
-                    "firewall default is deny but port 22 is not allowed; "
+                    f"firewall default is deny but SSH port {ssh_port} is not allowed; "
                     "this will lock you out of the server"
                 ),
                 path="firewall.allow",
@@ -116,8 +123,9 @@ def _check_firewall_defaults(config: Config, report: ValidationReport) -> None:
                 path="firewall.default",
             )
         )
+    ssh_port = _resolve_ssh_port(config)
     for port in config.firewall.allow:
-        if port in PRIVILEGED_PORTS and port != SSH_DEFAULT_PORT:
+        if port in PRIVILEGED_PORTS and port != ssh_port:
             report.add(
                 ValidationIssue(
                     severity=Severity.INFO,

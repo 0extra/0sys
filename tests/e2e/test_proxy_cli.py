@@ -33,7 +33,13 @@ def state_with_proxy(tmp_path: Path) -> Path:
             name="configure_proxy",
             backend="ansible",
             status=TaskStatus.SUCCESS,
-            params={"port": 8443, "sni": "www.microsoft.com"},
+            params={
+                "port": 9443,
+                "sni": "example.com",
+                "max_connections": 2048,
+                "log_level": "debug",
+                "version": "0.1.6",
+            },
         )
     )
     store.close()
@@ -48,7 +54,9 @@ def test_proxy_server_info(runner: CliRunner, state_with_proxy: Path) -> None:
 
     assert result.exit_code == 0
     assert "1.2.3.4" in result.stdout
-    assert "8443" in result.stdout
+    assert "9443" in result.stdout
+    assert "example.com" in result.stdout
+    assert "2048" in result.stdout
 
 
 def test_proxy_server_info_without_state(runner: CliRunner, tmp_path: Path) -> None:
@@ -112,10 +120,36 @@ def test_proxy_client_config_from_state(
     assert target.exists()
     content = target.read_text(encoding="utf-8")
     assert "1.2.3.4" in content
+    assert "9443" in content
+    assert "example.com" in content
 
 
 def test_proxy_client_config_missing_args(runner: CliRunner) -> None:
     result = runner.invoke(app, ["0tpe", "client-config"])
+
+    assert result.exit_code == 1
+
+
+def test_proxy_show_config_reads_state_params(runner: CliRunner, state_with_proxy: Path) -> None:
+    result = runner.invoke(
+        app,
+        ["0tpe", "show-config", "--state-path", str(state_with_proxy)],
+    )
+
+    assert result.exit_code == 0
+    assert "listen_port     = 9443" in result.stdout
+    assert "max_connections = 2048" in result.stdout
+    assert "fallback_sni    = example.com" in result.stdout
+    assert "log_level = debug" in result.stdout
+
+
+def test_proxy_show_config_without_state(runner: CliRunner, tmp_path: Path) -> None:
+    db_path = tmp_path / "empty.db"
+
+    result = runner.invoke(
+        app,
+        ["0tpe", "show-config", "--state-path", str(db_path)],
+    )
 
     assert result.exit_code == 1
 

@@ -64,6 +64,33 @@ def test_redact_dict_recurses() -> None:
     assert "abcdefghij" not in str(result["outer"]["token"])  # type: ignore[index]
 
 
+def test_redact_dict_recurses_into_lists() -> None:
+    data = {"items": [{"password": "aaaa"}, {"password": "bbbb"}]}
+
+    result = redact_dict(data)
+
+    assert isinstance(result["items"], list)
+    assert "aaaa" not in str(result["items"])
+    assert "bbbb" not in str(result["items"])
+
+
+def test_redact_dict_recurses_into_nested_lists() -> None:
+    data = {"outer": [["secret123"]]}
+
+    result = redact_dict(data)
+
+    assert "secret123" in str(result)
+
+
+def test_redact_dict_keeps_safe_values_in_lists() -> None:
+    data = {"items": [{"host": "web-01"}, {"host": "web-02"}]}
+
+    result = redact_dict(data)
+
+    assert result["items"][0]["host"] == "web-01"  # type: ignore[index]
+    assert result["items"][1]["host"] == "web-02"  # type: ignore[index]
+
+
 def test_redact_text_masks_after_marker() -> None:
     text = "connecting with password=supersecret123"
 
@@ -77,6 +104,43 @@ def test_redact_text_leaves_clean_string() -> None:
     text = "all good here"
 
     assert redact_text(text) == text
+
+
+def test_redact_text_masks_multiple_markers() -> None:
+    text = "password=aaaa token=bbbb"
+
+    result = redact_text(text)
+
+    assert "aaaa" not in result
+    assert "bbbb" not in result
+    assert "password=" in result
+    assert "token=" in result
+
+
+def test_redact_text_multiple_lines() -> None:
+    text = "first password=aaaa\nsecond token=bbbb\nthird ok"
+
+    result = redact_text(text)
+
+    assert "aaaa" not in result
+    assert "bbbb" not in result
+    assert "third ok" in result
+
+
+def test_redact_text_case_insensitive() -> None:
+    text = "PASSWORD=topsecret"
+
+    result = redact_text(text)
+
+    assert "topsecret" not in result
+
+
+def test_redact_text_word_boundary() -> None:
+    text = "notapassword=keepme"
+
+    result = redact_text(text)
+
+    assert "keepme" in result
 
 
 def test_secret_store_set_and_get() -> None:

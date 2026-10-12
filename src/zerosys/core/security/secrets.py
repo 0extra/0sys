@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
-from typing import cast
+from typing import Any
 
 from zerosys.utils.text import mask_secret
 
@@ -19,6 +20,11 @@ SENSITIVE_KEYS: frozenset[str] = frozenset(
         "ssh_key",
         "passphrase",
     }
+)
+
+_SENSITIVE_PATTERN = re.compile(
+    r"\b(" + "|".join(re.escape(key) for key in sorted(SENSITIVE_KEYS)) + r")=(\S+)",
+    re.IGNORECASE,
 )
 
 
@@ -41,28 +47,39 @@ def is_sensitive_key(key: str) -> bool:
     return key.strip().lower() in SENSITIVE_KEYS
 
 
-def redact_dict(data: dict[str, object]) -> dict[str, object]:
-    result: dict[str, object] = {}
+def redact_dict(data: dict[str, Any]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
     for key, value in data.items():
         if is_sensitive_key(key):
             result[key] = mask_secret(str(value))
         elif isinstance(value, dict):
-            result[key] = redact_dict(cast("dict[str, object]", value))
+            result[key] = redact_dict(value)
+        elif isinstance(value, list):
+            result[key] = _redact_list(value)
         else:
             result[key] = value
     return result
 
 
+def _redact_list(items: list[Any]) -> list[Any]:
+    result: list[Any] = []
+    for item in items:
+        if isinstance(item, dict):
+            result.append(redact_dict(item))
+        elif isinstance(item, list):
+            result.append(_redact_list(item))
+        else:
+            result.append(item)
+    return result
+
+
 def redact_text(text: str) -> str:
-    lowered = text.lower()
-    for token in SENSITIVE_KEYS:
-        marker = f"{token}="
-        index = lowered.find(marker)
-        if index == -1:
-            continue
-        end = index + len(marker)
-        return text[:end] + mask_secret(text[end:].strip())
-    return text
+    def _replace(match: re.Match[str]) -> str:
+        key = match.group(1)
+        value = match.group(2)
+        return f"{key}={mask_secret(value)}"
+
+    return _SENSITIVE_PATTERN.sub(_replace, text)
 
 
 @dataclass

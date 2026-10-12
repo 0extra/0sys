@@ -18,10 +18,6 @@ from zerosys.core.config.validator import Severity, validate
 pytestmark = pytest.mark.unit
 
 
-def _codes(config: Config) -> set[str]:
-    return {issue.code for issue in validate(config).issues}
-
-
 def test_fw001_firewall_deny_without_ssh() -> None:
     config = Config(
         version=CONFIG_VERSION,
@@ -45,6 +41,32 @@ def test_fw001_not_triggered_when_ssh_allowed() -> None:
     assert "FW001" not in {i.code for i in report.issues}
 
 
+def test_fw001_respects_custom_ssh_port() -> None:
+    config = Config(
+        version=CONFIG_VERSION,
+        server=ServerConfig(hostname="web", ssh_port=2222),
+        firewall=FirewallConfig(default="deny", allow=[2222]),
+    )
+
+    report = validate(config)
+
+    assert "FW001" not in {i.code for i in report.issues}
+
+
+def test_fw001_triggers_when_custom_ssh_port_missing() -> None:
+    config = Config(
+        version=CONFIG_VERSION,
+        server=ServerConfig(hostname="web", ssh_port=2222),
+        firewall=FirewallConfig(default="deny", allow=[22]),
+    )
+
+    report = validate(config)
+
+    assert "FW001" in {i.code for i in report.issues}
+    message = next(i.message for i in report.issues if i.code == "FW001")
+    assert "2222" in message
+
+
 def test_fw002_firewall_allow_default_warns() -> None:
     config = Config(
         version=CONFIG_VERSION,
@@ -55,6 +77,19 @@ def test_fw002_firewall_allow_default_warns() -> None:
 
     assert "FW002" in {i.code for i in report.issues}
     assert report.has_warnings
+
+
+def test_fw003_does_not_warn_on_custom_ssh_port() -> None:
+    config = Config(
+        version=CONFIG_VERSION,
+        server=ServerConfig(ssh_port=2222),
+        firewall=FirewallConfig(default="deny", allow=[2222]),
+    )
+
+    report = validate(config)
+
+    infos = {i.code for i in report.infos()}
+    assert "FW003" not in infos
 
 
 def test_fw004_nginx_without_http_ports() -> None:

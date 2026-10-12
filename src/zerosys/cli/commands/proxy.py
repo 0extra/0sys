@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import typer
 from platformdirs import user_data_dir
@@ -20,9 +21,23 @@ def _default_state_path() -> Path:
 @dataclass(frozen=True)
 class ProxyInfo:
     host: str
-    port: int
-    sni: str
     run_id: str
+    params: dict[str, Any]
+
+    def port(self) -> int:
+        return int(self.params.get("port", 8443))
+
+    def sni(self) -> str:
+        return str(self.params.get("sni", "www.microsoft.com"))
+
+    def max_connections(self) -> int:
+        return int(self.params.get("max_connections", 512))
+
+    def log_level(self) -> str:
+        return str(self.params.get("log_level", "info"))
+
+    def version(self) -> str:
+        return str(self.params.get("version", "0.1.5"))
 
 
 def _latest_proxy_info(store: StateStore) -> ProxyInfo | None:
@@ -34,13 +49,10 @@ def _latest_proxy_info(store: StateStore) -> ProxyInfo | None:
                 continue
             if task.status.value != "success":
                 continue
-            port = int(task.params.get("port", 8443))
-            sni = str(task.params.get("sni", "www.microsoft.com"))
             return ProxyInfo(
                 host=record.target_host,
-                port=port,
-                sni=sni,
                 run_id=record.id,
+                params=dict(task.params),
             )
     return None
 
@@ -72,8 +84,11 @@ def proxy_server_info_command(
     table.add_column("Field", style="task.kind")
     table.add_column("Value")
     table.add_row("Host", info.host)
-    table.add_row("Port", str(info.port))
-    table.add_row("SNI", info.sni)
+    table.add_row("Port", str(info.port()))
+    table.add_row("SNI", info.sni())
+    table.add_row("Max connections", str(info.max_connections()))
+    table.add_row("Log level", info.log_level())
+    table.add_row("Version", info.version())
     table.add_row("Run id", info.run_id)
     console.print(table)
 
@@ -116,8 +131,8 @@ def proxy_client_config_command(
 
         if info is not None:
             host = host or info.host
-            port = port or info.port
-            sni = sni or info.sni
+            port = port or info.port()
+            sni = sni or info.sni()
 
     if host is None or port is None or sni is None:
         console.print(
@@ -184,14 +199,14 @@ def proxy_show_config_command(
         "# 0TPE server config (reconstructed from state)",
         "",
         "listen_ip       = 0.0.0.0",
-        f"listen_port     = {info.port}",
-        "max_connections = 512",
+        f"listen_port     = {info.port()}",
+        f"max_connections = {info.max_connections()}",
         "cert_file       = certs/server.crt",
         "key_file        = certs/server.key",
         "ca_file         = certs/ca.crt",
-        f"fallback_sni    = {info.sni}",
+        f"fallback_sni    = {info.sni()}",
         "",
-        "log_level = info",
+        f"log_level = {info.log_level()}",
         "",
     ]
     console.print(Text("\n".join(lines)))

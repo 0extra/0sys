@@ -9,6 +9,9 @@ CONFIG_VERSION = 1
 ServiceState = Literal["started", "stopped", "restarted", "reloaded"]
 FirewallDefault = Literal["allow", "deny"]
 CommandWhen = Literal["always", "once", "changed"]
+InfrastructureProvider = Literal["hetzner", "digitalocean"]
+ProxyRuntime = Literal["docker"]
+ProxyLogLevel = Literal["debug", "info", "warn", "error"]
 
 
 class ServerConfig(BaseModel):
@@ -17,6 +20,7 @@ class ServerConfig(BaseModel):
     hostname: Annotated[str, Field(min_length=1, max_length=253)] | None = None
     timezone: str | None = None
     locale: str | None = None
+    ssh_port: Annotated[int, Field(ge=1, le=65535)] = 22
 
     @field_validator("hostname")
     @classmethod
@@ -92,9 +96,6 @@ class FirewallConfig(BaseModel):
         return sorted(set(v))
 
 
-InfrastructureProvider = Literal["hetzner", "digitalocean"]
-
-
 class InfrastructureConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
@@ -110,10 +111,6 @@ class InfrastructureConfig(BaseModel):
     @classmethod
     def _deduplicate(cls, v: list[str]) -> list[str]:
         return list(dict.fromkeys(v))
-
-
-ProxyRuntime = Literal["docker"]
-ProxyLogLevel = Literal["debug", "info", "warn", "error"]
 
 
 class ProxyConfig(BaseModel):
