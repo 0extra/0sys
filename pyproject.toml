@@ -5,24 +5,27 @@ build-backend = "hatchling.build"
 [project]
 name = "zerosys"
 version = "0.1.0"
-description = "A friendly server automation tool for beginner sysadmins"
+description = "Friendly server automation for beginner sysadmins, with validation, planning, and plain-English explanations"
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [
     { name = "0extra", email = "0extra@proton.me" }
 ]
 requires-python = ">=3.11"
-keywords = ["sysadmin", "automation", "server", "ansible", "devops", "beginner"]
+keywords = ["sysadmin", "automation", "server", "ansible", "terraform", "cloud-init", "nixos", "devops", "beginner", "wizard"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
+    "Intended Audience :: Education",
     "Intended Audience :: System Administrators",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Topic :: Education",
     "Topic :: System :: Systems Administration",
 ]
 
@@ -109,6 +112,7 @@ ignore = [
 "src/zerosys/cli/app.py" = ["ARG001"]
 "src/zerosys/cli/commands/check.py" = ["ARG001"]
 "src/zerosys/cli/commands/apply.py" = ["PLR0912", "PLR0915", "ARG001"]
+"src/zerosys/cli/commands/proxy.py" = ["PLR0912", "PLR0915"]
 "src/zerosys/cli/ui/progress.py" = ["ARG002"]
 "src/zerosys/backends/**/*.py" = ["ARG002", "PLC0415"]
 "src/zerosys/backends/ansible/generator.py" = ["PLR0911"]
