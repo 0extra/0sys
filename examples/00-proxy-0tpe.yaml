@@ -16,7 +16,7 @@ proxy:
   sni: www.microsoft.com
   max_connections: 512
   log_level: info
-  version: "0.1.5"
+  version: "0.1.6"
   # commit_sha: "a1b2c3d4e5f6..."
 
 firewall:

@@ -17,7 +17,7 @@ def test_proxy_config_defaults() -> None:
     assert proxy.sni == "www.microsoft.com"
     assert proxy.max_connections == 512
     assert proxy.log_level == "info"
-    assert proxy.version == "0.1.5"
+    assert proxy.version == "0.1.6"
     assert proxy.install_dir == "/opt/0tpe"
     assert proxy.ssh_keys == []
 

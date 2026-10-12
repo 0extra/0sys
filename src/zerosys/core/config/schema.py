@@ -122,7 +122,7 @@ class ProxyConfig(BaseModel):
     sni: Annotated[str, Field(min_length=1, max_length=253)] = "www.microsoft.com"
     max_connections: Annotated[int, Field(ge=1, le=65535)] = 512
     log_level: ProxyLogLevel = "info"
-    version: str = "0.1.5"
+    version: str = "0.1.6"
     commit_sha: str | None = None
     install_dir: str = "/opt/0tpe"
     ssh_keys: list[str] = Field(default_factory=list)
