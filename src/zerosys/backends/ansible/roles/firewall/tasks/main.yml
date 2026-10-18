@@ -1,14 +1,9 @@
 ---
-- name: End role early inside containers
-  ansible.builtin.meta: end_role
-  when: ansible_facts['virtualization_type'] in ["docker", "container", "lxc", "podman"]
-
 - name: Fail on unsupported OS family (refuse to silently skip the firewall)
   ansible.builtin.fail:
     msg: >-
       The firewall role supports Debian-family (ufw) and RedHat-family (firewalld)
       systems only. Detected os_family: {{ ansible_facts['os_family'] }}.
-      Refusing to continue so you are not left with an unprotected server.
   when: ansible_facts['os_family'] not in ["Debian", "RedHat"]
 
 - name: Install firewall packages

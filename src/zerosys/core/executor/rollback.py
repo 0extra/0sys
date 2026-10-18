@@ -53,9 +53,14 @@ class Rollbacker:
         for task in ordered:
             if not task.idempotent:
                 continue
+
             if task.result is not None and not task.result.changed:
-                report.skipped += 1
-                continue
+                if not self.options.aggressive:
+                    report.skipped += 1
+                    continue
+                if task.kind not in HELD_WITHOUT_AGGRESSIVE:
+                    report.skipped += 1
+                    continue
 
             backend = self._backend_for(task)
             if backend is None:
