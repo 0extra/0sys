@@ -6,6 +6,7 @@ import typer
 
 from zerosys.cli.commands import (
     apply_command,
+    audit_command,
     check_command,
     cloud_init_command,
     nixos_command,
@@ -35,6 +36,7 @@ from zerosys.cli.commands import (
 from zerosys.cli.commands import (
     tips as tips_cmd,
 )
+from zerosys.cli.commands.tui import tui_command
 from zerosys.cli.ui.banner import print_banner, print_mini_banner
 from zerosys.cli.ui.theme import build_console
 
@@ -47,48 +49,26 @@ app = typer.Typer(
 )
 
 proxy_app = typer.Typer(help="Manage the 0TPE proxy server")
-proxy_app.command(
-    "server-info",
-    help="Show proxy server details from state",
-)(proxy_server_info_command)
-proxy_app.command(
-    "client-config",
-    help="Generate a client config file",
-)(proxy_client_config_command)
-proxy_app.command(
-    "show-config",
-    help="Show reconstructed server config",
-)(proxy_show_config_command)
-proxy_app.command(
-    "fetch-certs",
-    help="Download certificates from the server",
-)(proxy_fetch_certs_command)
+proxy_app.command("server-info")(proxy_server_info_command)
+proxy_app.command("client-config")(proxy_client_config_command)
+proxy_app.command("show-config")(proxy_show_config_command)
+proxy_app.command("fetch-certs")(proxy_fetch_certs_command)
 
 
 app.command("plan", help="Show what 0sys would do")(plan_command)
 app.command("apply", help="Apply a configuration")(apply_command)
 app.command("check", help="Dry-run a configuration")(check_command)
-app.command(
-    "rollback",
-    help="Inspect past runs and roll back safe operations",
-)(rollback_command)
-app.command(
-    "cloud-init",
-    help="Generate cloud-init user-data for a VPS provider",
-)(cloud_init_command)
-app.command(
-    "terraform",
-    help="Generate Terraform HCL to create infrastructure",
-)(terraform_command)
-app.command(
-    "nixos",
-    help="Generate a NixOS configuration.nix from the config",
-)(nixos_command)
+app.command("audit", help="Scan a server and generate a config")(audit_command)
+app.command("rollback", help="Inspect past runs and roll back safe operations")(rollback_command)
+app.command("cloud-init", help="Generate cloud-init user-data")(cloud_init_command)
+app.command("terraform", help="Generate Terraform HCL")(terraform_command)
+app.command("nixos", help="Generate NixOS configuration.nix")(nixos_command)
+app.command("tui", help="Launch the interactive terminal UI")(tui_command)
 
-app.add_typer(doctor_cmd.app, name="doctor", help="Check environment for missing pieces")
+app.add_typer(doctor_cmd.app, name="doctor", help="Check environment")
 app.add_typer(examples_cmd.app, name="examples", help="Show example configurations")
-app.add_typer(explain_cmd.app, name="explain", help="Explain a configuration in plain English")
-app.add_typer(init_cmd.app, name="init", help="Create a starter configuration file")
+app.add_typer(explain_cmd.app, name="explain", help="Explain a configuration")
+app.add_typer(init_cmd.app, name="init", help="Create a starter configuration")
 app.add_typer(explain_term_cmd.app, name="explain-term", help="Explain a technical term")
 app.add_typer(tips_cmd.app, name="tips", help="Show practical tips")
 app.add_typer(proxy_app, name="0tpe", help="0TPE proxy server helpers")
