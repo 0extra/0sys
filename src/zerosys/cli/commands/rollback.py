@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -174,10 +175,8 @@ def _execute_rollback(
 
     for task in executed:
         if task.status is TaskStatus.ROLLED_BACK:
-            try:
+            with contextlib.suppress(StateError):
                 store.save_task(TaskRecord.from_task(run_id, task))
-            except StateError:
-                pass
 
     return 0 if report.failed == 0 else 1
 

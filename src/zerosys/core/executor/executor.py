@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import traceback
 from collections.abc import Callable
 
 from zerosys.backends.base import Backend
@@ -64,9 +65,10 @@ class Executor:
                 changed=False,
             )
         except Exception as exc:
+            tb = traceback.format_exc()
             result = TaskResult(
                 status=TaskStatus.FAILED,
-                message=f"unexpected error: {exc}",
+                message=f"unexpected error: {exc}\n\nTraceback:\n{tb}",
                 changed=False,
             )
 

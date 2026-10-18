@@ -53,46 +53,57 @@ class Rollbacker:
         for task in ordered:
             if not task.idempotent:
                 continue
-            if task.status is TaskStatus.ROLLED_BACK:
-                report.skipped += 1
-                continue
 
-            if task.result is not None and not task.result.changed:
-                if not self.options.aggressive:
-                    report.skipped += 1
-                    continue
-                if task.kind not in HELD_WITHOUT_AGGRESSIVE:
-                    report.skipped += 1
-                    continue
+            if self._should_skip(task, report):
+                continue
 
             backend = self._backend_for(task)
             if backend is None:
                 report.not_reversible.append(task.name)
                 continue
+
             if not backend.can_rollback(task):
-                report.not_reversible.append(task.name)
-                continue
-            if task.kind in HELD_WITHOUT_AGGRESSIVE and not self.options.aggressive:
                 report.not_reversible.append(task.name)
                 continue
 
             report.attempted += 1
-            result = self._attempt_rollback(task, backend)
-            if result.status is TaskStatus.SUCCESS:
-                report.successful += 1
-                report.reversed_tasks.append(task)
-                task.mark_rolled_back(result.message)
-                self.state.register_rollback(task)
-            elif result.status is TaskStatus.SKIPPED:
-                report.skipped += 1
-            else:
-                report.failed += 1
-                report.failed_tasks.append(task)
-                task.mark_failed(result)
-                if self.options.stop_on_failure:
-                    break
+            self._process_task(task, backend, report)
+
+            if report.failed > 0 and self.options.stop_on_failure:
+                break
 
         return report
+
+    def _should_skip(self, task: Task, report: RollbackReport) -> bool:
+        if task.status is TaskStatus.ROLLED_BACK:
+            report.skipped += 1
+            return True
+
+        is_unchanged = task.result is not None and not task.result.changed
+        if is_unchanged:
+            if not self.options.aggressive or task.kind not in HELD_WITHOUT_AGGRESSIVE:
+                report.skipped += 1
+                return True
+
+        if task.kind in HELD_WITHOUT_AGGRESSIVE and not self.options.aggressive:
+            report.not_reversible.append(task.name)
+            return True
+
+        return False
+
+    def _process_task(self, task: Task, backend: Backend, report: RollbackReport) -> None:
+        result = self._attempt_rollback(task, backend)
+        if result.status is TaskStatus.SUCCESS:
+            report.successful += 1
+            report.reversed_tasks.append(task)
+            task.mark_rolled_back(result.message)
+            self.state.register_rollback(task)
+        elif result.status is TaskStatus.SKIPPED:
+            report.skipped += 1
+        else:
+            report.failed += 1
+            report.failed_tasks.append(task)
+            task.mark_failed(result)
 
     def _backend_for(self, task: Task) -> Backend | None:
         if task.backend is None:

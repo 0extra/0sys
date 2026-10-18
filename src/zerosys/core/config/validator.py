@@ -252,6 +252,24 @@ def _check_files(config: Config, report: ValidationReport) -> None:
 def _check_commands(config: Config, report: ValidationReport) -> None:
     seen_names: set[str] = set()
     for entry in config.commands:
+        if not entry.name.strip():
+            report.add(
+                ValidationIssue(
+                    severity=Severity.ERROR,
+                    code="CMD002",
+                    message="command name cannot be empty",
+                    path="commands",
+                )
+            )
+        if not entry.run.strip():
+            report.add(
+                ValidationIssue(
+                    severity=Severity.ERROR,
+                    code="CMD003",
+                    message=f"command '{entry.name}' has an empty 'run' string",
+                    path=f"commands.{entry.name}",
+                )
+            )
         if entry.name in seen_names:
             report.add(
                 ValidationIssue(
