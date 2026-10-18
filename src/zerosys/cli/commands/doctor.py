@@ -78,7 +78,11 @@ def run() -> None:
         _check_module("jinja2"),
         _check_module("ansible_runner", required=False),
         _check_binary("ansible-playbook", required=False),
+        _check_binary("terraform", required=False),
+        _check_binary("nixos-rebuild", required=False),
+        _check_binary("docker", required=False),
         _check_binary("ssh", required=False),
+        _check_binary("ssh-keygen", required=False),
     ]
 
     _render(console, results)
@@ -94,10 +98,8 @@ def run() -> None:
         raise typer.Exit(code=1)
 
     if missing_optional:
-        console.print(
-            f"[warning]Optional components missing: "
-            f"{', '.join(r.name for r in missing_optional)}[/warning]"
-        )
-        console.print("[hint]Install ansible to enable the ansible backend.[/hint]")
+        names = ", ".join(r.name for r in missing_optional)
+        console.print(f"[warning]Optional components missing: {names}[/warning]")
+        console.print("[hint]Install them if you plan to use the related backends.[/hint]")
 
     console.print("[success]Environment looks good.[/success]")

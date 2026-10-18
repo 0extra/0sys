@@ -206,6 +206,7 @@ def _list_runs(console: Console, store: StateStore) -> None:
 def rollback_command(
     run_id: str | None = typer.Argument(None, help="Run id to roll back"),
     list_runs: bool = typer.Option(False, "--list", "-l", help="List recent runs"),
+    clean: bool = typer.Option(False, "--clean", help="Delete old run history (keeps last 50)"),
     state_path: Path | None = typer.Option(
         None,
         "--state-path",
@@ -241,6 +242,17 @@ def rollback_command(
     except StateError as exc:
         print_error(str(exc), console)
         raise typer.Exit(code=1) from exc
+
+    if clean:
+        try:
+            deleted = store.clean_old_runs(keep_last=50)
+            print_success(f"Cleaned {deleted} old runs from history.", console)
+        except StateError as exc:
+            print_error(str(exc), console)
+            raise typer.Exit(code=1) from exc
+        finally:
+            store.close()
+        raise typer.Exit(code=0)
 
     if list_runs or run_id is None:
         _list_runs(console, store)

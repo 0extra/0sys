@@ -176,6 +176,19 @@ class StateStore:
         row = cursor.fetchone()
         return int(row[0]) if row else 0
 
+    def clean_old_runs(self, keep_last: int = 50) -> int:
+        conn = self.connect()
+        try:
+            cursor = conn.execute(
+                "DELETE FROM runs WHERE id NOT IN ("
+                "  SELECT id FROM runs ORDER BY started_at DESC LIMIT ?"
+                ")",
+                (keep_last,),
+            )
+            return cursor.rowcount
+        except sqlite3.Error as exc:
+            raise StateError(f"failed to clean old runs: {exc}") from exc
+
     def __enter__(self) -> StateStore:
         self.connect()
         return self
