@@ -55,8 +55,8 @@ dev = [
 ]
 
 [project.scripts]
-zerosys = "zerosys.cli.app:main"
-0sys = "zerosys.cli.app:main"
+zerosys = "zerosys.cli.app:cli_main"
+0sys = "zerosys.cli.app:cli_main"
 
 [project.urls]
 Homepage = "https://github.com/0extra/0sys"

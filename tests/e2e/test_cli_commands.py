@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -137,3 +139,45 @@ def test_check_does_not_create_state(
 
     assert result.exit_code == 0
     assert list(state_dir.rglob("state.db")) == []
+
+
+@pytest.mark.skipif(shutil.which("0sys") is None, reason="0sys not installed in PATH")
+def test_console_script_0sys_version() -> None:
+    completed = subprocess.run(
+        ["0sys", "--version"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "0sys" in completed.stdout.lower()
+
+
+@pytest.mark.skipif(shutil.which("0sys") is None, reason="0sys not installed in PATH")
+def test_console_script_0sys_help() -> None:
+    completed = subprocess.run(
+        ["0sys", "--help"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "plan" in completed.stdout
+
+
+@pytest.mark.skipif(shutil.which("zerosys") is None, reason="zerosys not installed in PATH")
+def test_console_script_zerosys_version() -> None:
+    completed = subprocess.run(
+        ["zerosys", "--version"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "0sys" in completed.stdout.lower()

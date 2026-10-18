@@ -235,3 +235,99 @@ def test_rollback_report_summary(fake_backend: _FakeBackend) -> None:
 
     assert "rolled back" in summary
     assert "not reversible" in summary
+
+
+def test_rollback_aggressive_skips_unchanged() -> None:
+    registry = get_registry()
+    original = registry._backends.get("fake_ansible")
+    fake_backend = _FakeBackend("fake_ansible")
+    registry.register(fake_backend)
+
+    try:
+        task = Task(kind=TaskKind.USER, name="user_testuser3", backend="fake_ansible")
+        task.mark_success(TaskResult(status=TaskStatus.SUCCESS, changed=False))
+
+        state = ExecutionState(total=1)
+        state.register_success(task)
+
+        class _FakeContext:
+            backend_context = BackendContext(target_host="localhost")
+
+        rollbacker_normal = Rollbacker(_FakeContext(), state, RollbackOptions(aggressive=False))
+        report_normal = rollbacker_normal.rollback()
+        assert report_normal.successful == 0
+        assert report_normal.skipped == 1
+
+        rollbacker_aggressive = Rollbacker(_FakeContext(), state, RollbackOptions(aggressive=True))
+        report_aggressive = rollbacker_aggressive.rollback()
+        assert report_aggressive.successful == 0
+        assert report_aggressive.skipped == 1
+        assert fake_backend.rollback_calls == []
+    finally:
+        if original is not None:
+            registry.register(original)
+        else:
+            registry._backends.pop("fake_ansible", None)
+
+
+def test_rollback_aggressive_removes_only_changed() -> None:
+    registry = get_registry()
+    original = registry._backends.get("fake_ansible")
+    fake_backend = _FakeBackend("fake_ansible")
+    registry.register(fake_backend)
+
+    try:
+        changed_task = Task(kind=TaskKind.USER, name="user_changed", backend="fake_ansible")
+        changed_task.mark_success(TaskResult(status=TaskStatus.SUCCESS, changed=True))
+
+        unchanged_task = Task(kind=TaskKind.USER, name="user_unchanged", backend="fake_ansible")
+        unchanged_task.mark_success(TaskResult(status=TaskStatus.SUCCESS, changed=False))
+
+        state = ExecutionState(total=2)
+        state.register_success(changed_task)
+        state.register_success(unchanged_task)
+
+        class _FakeContext:
+            backend_context = BackendContext(target_host="localhost")
+
+        report = Rollbacker(_FakeContext(), state, RollbackOptions(aggressive=True)).rollback()
+
+        assert report.successful == 1
+        assert report.skipped == 1
+        assert fake_backend.rollback_calls == ["user_changed"]
+    finally:
+        if original is not None:
+            registry.register(original)
+        else:
+            registry._backends.pop("fake_ansible", None)
+
+
+def test_rollback_twice_is_idempotent() -> None:
+    registry = get_registry()
+    original = registry._backends.get("fake_ansible")
+    fake_backend = _FakeBackend("fake_ansible")
+    registry.register(fake_backend)
+
+    try:
+        task = Task(kind=TaskKind.USER, name="user_x", backend="fake_ansible")
+        task.mark_success(TaskResult(status=TaskStatus.SUCCESS, changed=True))
+
+        state = ExecutionState(total=1)
+        state.register_success(task)
+
+        class _FakeContext:
+            backend_context = BackendContext(target_host="localhost")
+
+        first = Rollbacker(_FakeContext(), state, RollbackOptions(aggressive=True)).rollback()
+        assert first.successful == 1
+        assert fake_backend.rollback_calls == ["user_x"]
+
+        second = Rollbacker(_FakeContext(), state, RollbackOptions(aggressive=True)).rollback()
+        assert second.successful == 0
+        assert second.skipped == 1
+        assert fake_backend.rollback_calls == ["user_x"]
+    finally:
+        if original is not None:
+            registry.register(original)
+        else:
+            registry._backends.pop("fake_ansible", None)

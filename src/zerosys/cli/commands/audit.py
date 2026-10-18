@@ -77,4 +77,11 @@ def audit_command(
     console.print(f"  Services found: {len(config.services)}")
     console.print(f"  Users found:    {len(config.users)}")
     console.print("")
-    console.print("[hint]Review the file and adjust it before running '0sys apply'.[/hint]")
+
+    warning_msg = (
+        "WARNING: This is a partial snapshot. Packages are limited to 50, "
+        "services to 20. Firewall rules are inferred from UFW and may be incomplete. "
+        "Users are created without sudo by default."
+    )
+    console.print(f"[warning]{warning_msg}[/warning]")
+    console.print("[hint]Review the file carefully before running '0sys apply'.[/hint]")

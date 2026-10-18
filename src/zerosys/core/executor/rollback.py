@@ -80,9 +80,7 @@ class Rollbacker:
             return True
 
         is_unchanged = task.result is not None and not task.result.changed
-        if is_unchanged and (
-            not self.options.aggressive or task.kind not in HELD_WITHOUT_AGGRESSIVE
-        ):
+        if is_unchanged:
             report.skipped += 1
             return True
 

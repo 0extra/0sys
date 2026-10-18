@@ -120,7 +120,7 @@ class AuditScanner:
                 install=result.packages,
             ),
             services={svc: ServiceConfig(state="started", enabled=True) for svc in result.services},
-            users=[UserConfig(name=user, shell="/bin/bash", sudo=True) for user in result.users],
+            users=[UserConfig(name=user, shell="/bin/bash", sudo=False) for user in result.users],
             firewall=FirewallConfig(
                 default="deny",
                 allow=result.firewall_ports if result.firewall_ports else [22],

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import shutil
+import subprocess
 import sys
 from dataclasses import dataclass
 
@@ -44,6 +45,24 @@ def _check_binary(name: str, required: bool = False) -> CheckResult:
     return CheckResult(name, ok, detail, required=required)
 
 
+def _check_ansible_collection(name: str) -> CheckResult:
+    if shutil.which("ansible-galaxy") is None:
+        return CheckResult(name, False, "ansible-galaxy not found", required=False)
+    try:
+        completed = subprocess.run(
+            ["ansible-galaxy", "collection", "list", name],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return CheckResult(name, False, str(exc), required=False)
+    ok = completed.returncode == 0 and name in completed.stdout
+    detail = "installed" if ok else "missing"
+    return CheckResult(name, ok, detail, required=False)
+
+
 def _render(console: Console, results: list[CheckResult]) -> None:
     table = Table(title="0sys doctor", border_style="primary")
     table.add_column("Check", style="task.kind")
@@ -78,6 +97,9 @@ def run() -> None:
         _check_module("jinja2"),
         _check_module("ansible_runner", required=False),
         _check_binary("ansible-playbook", required=False),
+        _check_ansible_collection("community.general"),
+        _check_ansible_collection("community.docker"),
+        _check_ansible_collection("ansible.posix"),
         _check_binary("terraform", required=False),
         _check_binary("nixos-rebuild", required=False),
         _check_binary("docker", required=False),

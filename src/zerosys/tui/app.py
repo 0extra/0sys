@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import contextlib
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from textual import work
 from textual.app import App, ComposeResult
@@ -15,8 +16,11 @@ from zerosys.core.config.schema import Config
 from zerosys.core.config.validator import validate
 from zerosys.core.executor.context import ExecutionContext, ExecutionOptions
 from zerosys.core.executor.executor import Executor
+from zerosys.core.executor.state import ExecutionState
 from zerosys.core.planner.planner import build_plan
 from zerosys.core.planner.task import Task, TaskStatus
+from zerosys.core.state import StateStore
+from zerosys.core.state.models import RunRecord, TaskRecord
 
 BindingType = Binding | tuple[str, str] | tuple[str, str, str]
 
@@ -31,7 +35,7 @@ class ZeroSysTUI(App[None]):
         layout: horizontal;
     }
     #sidebar {
-        width: 30;
+        width: 35;
         height: 100%;
         border-right: solid $primary;
         padding: 1;
@@ -51,7 +55,7 @@ class ZeroSysTUI(App[None]):
         text-style: bold;
         color: $accent;
     }
-    #config-path {
+    .input-field {
         margin-bottom: 1;
     }
     """
@@ -69,12 +73,22 @@ class ZeroSysTUI(App[None]):
         yield Header(show_clock=True)
         with Horizontal(id="main-container"):
             with Vertical(id="sidebar"):
-                yield Label("Configuration", classes="section-title")
+                yield Label("Config Path", classes="section-title")
                 yield Input(
-                    placeholder="Path to config",
+                    placeholder="0sys.yaml",
                     value=str(self.config_path),
                     id="config-path",
+                    classes="input-field",
                 )
+
+                yield Label("Target Host", classes="section-title")
+                yield Input(
+                    placeholder="localhost",
+                    value="localhost",
+                    id="target-host",
+                    classes="input-field",
+                )
+
                 yield Button(
                     "Load Config",
                     id="btn-load",
@@ -166,53 +180,119 @@ class ZeroSysTUI(App[None]):
 
     @work(thread=True)
     def _run_check(self) -> None:
-        self.call_from_thread(self._execute, dry_run=True)
+        self._execute(dry_run=True)
 
     @work(thread=True)
     def _run_apply(self) -> None:
-        self.call_from_thread(self._execute, dry_run=False)
+        self._execute(dry_run=False)
 
     def _execute(self, dry_run: bool) -> None:
         log = self.query_one("#log", RichLog)
         mode = "[warning]CHECK (DRY-RUN)[/warning]" if dry_run else "[error]APPLY[/error]"
-        log.write(f"Starting {mode}...")
+        self.call_from_thread(log.write, f"Starting {mode}...")
 
         config = self.current_config
         if config is None:
-            log.write("[error]No config loaded.[/error]")
+            self.call_from_thread(log.write, "[error]No config loaded.[/error]")
             return
 
         report = validate(config, connect_port=22)
         if report.has_errors:
-            log.write("[error]Aborted due to validation errors.[/error]")
+            self.call_from_thread(log.write, "[error]Aborted due to validation errors.[/error]")
             return
 
         plan = build_plan(config)
-        backend_ctx = BackendContext(target_host="localhost", dry_run=dry_run)
+        host_input = self.query_one("#target-host", Input)
+        target_host = host_input.value.strip() or "localhost"
+
+        backend_ctx = BackendContext(target_host=target_host, dry_run=dry_run)
         options = ExecutionOptions(dry_run=dry_run)
         context = ExecutionContext(plan=plan, backend_context=backend_ctx, options=options)
 
+        store, run_record = None, None
+        if not dry_run:
+            store, run_record = self._setup_state(plan, target_host)
+            if store is None:
+                msg = "[error]State store unavailable. Apply aborted.[/error]"
+                self.call_from_thread(log.write, msg)
+                return
+
+        state = self._run_executor(context, store, run_record, log)
+        if state is None:
+            return
+
+        if state.has_failures():
+            msg = f"[error]Finished with failures: {state.summary()}[/error]"
+            self.call_from_thread(log.write, msg)
+        else:
+            msg = f"[success]Finished: {state.summary()}[/success]"
+            self.call_from_thread(log.write, msg)
+
+        if store and run_record:
+            self._finalize_state(store, run_record, state)
+
+    def _setup_state(
+        self, plan: Any, target_host: str
+    ) -> tuple[StateStore | None, RunRecord | None]:
+        state_path = Path.home() / ".local" / "share" / "0sys" / "state.db"
+        try:
+            store = StateStore(state_path)
+            run_record = RunRecord(
+                config_path=str(self.config_path.resolve()),
+                target_host=target_host,
+                total_tasks=plan.size(),
+                dry_run=False,
+            )
+            store.save_run(run_record)
+            return store, run_record
+        except Exception:
+            return None, None
+
+    def _run_executor(
+        self,
+        context: ExecutionContext,
+        store: StateStore | None,
+        run_record: RunRecord | None,
+        log: RichLog,
+    ) -> ExecutionState | None:
+        saved_ids: set[str] = set()
+
         def on_start(task: Task) -> None:
-            log.write(f"[primary]→[/primary] {task.name} ...")
+            self.call_from_thread(log.write, f"[primary]→[/primary] {task.name} ...")
 
         def on_finish(task: Task) -> None:
             if task.status is TaskStatus.SUCCESS:
                 changed = task.result.changed if task.result else False
                 suffix = "(changed)" if changed else "(no change)"
-                log.write(f"[success]✓[/success] {task.name} {suffix}")
+                self.call_from_thread(log.write, f"[success]✓[/success] {task.name} {suffix}")
             elif task.status is TaskStatus.FAILED:
-                log.write(f"[error]✗[/error] {task.name}")
+                self.call_from_thread(log.write, f"[error]✗[/error] {task.name}")
+
+            if store and run_record and task.id not in saved_ids:
+                with contextlib.suppress(Exception):
+                    store.save_task(TaskRecord.from_task(run_record.id, task))
+                    saved_ids.add(task.id)
 
         executor = Executor(context, on_task_start=on_start, on_task_finish=on_finish)
-
         try:
-            state = executor.execute()
-            if state.has_failures():
-                log.write(f"[error]Finished with failures: {state.summary()}[/error]")
-            else:
-                log.write(f"[success]Finished: {state.summary()}[/success]")
+            return executor.execute()
         except Exception as exc:
-            log.write(f"[error]Execution error: {exc}[/error]")
+            self.call_from_thread(log.write, f"[error]Execution error: {exc}[/error]")
+            return None
+
+    def _finalize_state(
+        self,
+        store: StateStore,
+        run_record: RunRecord,
+        state: ExecutionState,
+    ) -> None:
+        run_record.successful_tasks = state.successful
+        run_record.failed_tasks = state.failed
+        run_record.skipped_tasks = state.skipped
+        run_record.finish(state.final_status())
+        with contextlib.suppress(Exception):
+            store.update_run(run_record)
+        store.close()
 
 
 def run_tui() -> None:

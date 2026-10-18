@@ -11,8 +11,8 @@ from zerosys.core.state.models import RunRecord, TaskRecord
 MIGRATIONS_DIR = Path(__file__).resolve().parent / "migrations"
 
 RUN_COLUMNS = (
-    "id, config_path, config_hash, target_host, target_user, "
-    "started_at, finished_at, status, total_tasks, successful_tasks, "
+    "id, config_path, config_hash, target_host, target_user, target_port, "
+    "ssh_key_path, started_at, finished_at, status, total_tasks, successful_tasks, "
     "failed_tasks, skipped_tasks, dry_run"
 )
 
@@ -21,8 +21,18 @@ TASK_COLUMNS = (
     "stdout, stderr, changed, duration_ms, started_at, finished_at, params"
 )
 
+_RUN_PLACEHOLDERS = ", ".join(["?"] * 15)
+_RUN_INSERT_SQL = f"INSERT INTO runs ({RUN_COLUMNS}) VALUES ({_RUN_PLACEHOLDERS})"
+
 _TASK_PLACEHOLDERS = ", ".join(["?"] * 16)
-_TASK_INSERT_SQL = f"INSERT INTO tasks ({TASK_COLUMNS}) VALUES ({_TASK_PLACEHOLDERS})"
+_TASK_INSERT_SQL = (
+    f"INSERT INTO tasks ({TASK_COLUMNS}) VALUES ({_TASK_PLACEHOLDERS}) "
+    "ON CONFLICT(run_id, task_id) DO UPDATE SET "
+    "status=excluded.status, message=excluded.message, "
+    "stdout=excluded.stdout, stderr=excluded.stderr, "
+    "changed=excluded.changed, duration_ms=excluded.duration_ms, "
+    "started_at=excluded.started_at, finished_at=excluded.finished_at"
+)
 
 
 class StateStore:
@@ -97,10 +107,7 @@ class StateStore:
     def save_run(self, run: RunRecord) -> None:
         conn = self.connect()
         try:
-            conn.execute(
-                f"INSERT INTO runs ({RUN_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                run.to_row(),
-            )
+            conn.execute(_RUN_INSERT_SQL, run.to_row())
         except sqlite3.Error as exc:
             raise StateError(f"failed to save run: {exc}") from exc
 

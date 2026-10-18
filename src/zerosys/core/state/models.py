@@ -27,6 +27,8 @@ class RunRecord(BaseModel):
     config_hash: str | None = None
     target_host: str = "localhost"
     target_user: str | None = None
+    target_port: int = 22
+    ssh_key_path: str | None = None
     started_at: str = Field(default_factory=_now)
     finished_at: str | None = None
     status: TaskStatus = TaskStatus.RUNNING
@@ -47,6 +49,8 @@ class RunRecord(BaseModel):
             self.config_hash,
             self.target_host,
             self.target_user,
+            self.target_port,
+            self.ssh_key_path,
             self.started_at,
             self.finished_at,
             self.status.value,
@@ -65,14 +69,16 @@ class RunRecord(BaseModel):
             config_hash=row[2],
             target_host=row[3],
             target_user=row[4],
-            started_at=row[5],
-            finished_at=row[6],
-            status=TaskStatus(row[7]),
-            total_tasks=row[8],
-            successful_tasks=row[9],
-            failed_tasks=row[10],
-            skipped_tasks=row[11],
-            dry_run=bool(row[12]),
+            target_port=row[5] if row[5] is not None else 22,
+            ssh_key_path=row[6],
+            started_at=row[7],
+            finished_at=row[8],
+            status=TaskStatus(row[9]),
+            total_tasks=row[10],
+            successful_tasks=row[11],
+            failed_tasks=row[12],
+            skipped_tasks=row[13],
+            dry_run=bool(row[14]),
         )
 
 
@@ -157,7 +163,7 @@ class TaskRecord(BaseModel):
             target=task.target,
             backend=task.backend,
             status=task.status,
-            message=result.message if result else "",
+            message=redact_text(result.message) if result else "",
             stdout=redact_text(result.stdout) if result else "",
             stderr=redact_text(result.stderr) if result else "",
             changed=result.changed if result else False,
