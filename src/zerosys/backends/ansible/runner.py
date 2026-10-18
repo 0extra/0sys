@@ -37,6 +37,7 @@ class AnsibleRunner:
         work_dir: Path | None = None,
         verbose: bool = False,
         known_hosts_file: Path | None = None,
+        strict_host_key: bool = False,
     ) -> None:
         self.inventory_host = inventory_host
         self.inventory_user = inventory_user
@@ -46,6 +47,7 @@ class AnsibleRunner:
         self.work_dir = work_dir
         self.verbose = verbose
         self.known_hosts_file = known_hosts_file
+        self.strict_host_key = strict_host_key
 
     def run(
         self,
@@ -108,8 +110,9 @@ class AnsibleRunner:
             with contextlib.suppress(OSError):
                 known_hosts.parent.mkdir(parents=True, exist_ok=True)
 
+            check_mode = "yes" if self.strict_host_key else "accept-new"
             host_vars["ansible_ssh_common_args"] = (
-                "-o StrictHostKeyChecking=accept-new "
+                f"-o StrictHostKeyChecking={check_mode} "
                 f"-o UserKnownHostsFile={shlex.quote(str(known_hosts))}"
             )
 
@@ -135,7 +138,7 @@ class AnsibleRunner:
         env_dir = project_dir / "env"
         env_dir.mkdir(parents=True, exist_ok=True)
         settings: dict[str, Any] = {
-            "host_key_checking": True,
+            "host_key_checking": self.strict_host_key,
             "retry_files_enabled": False,
             "stdout_callback": "default",
             "gathering": "smart",

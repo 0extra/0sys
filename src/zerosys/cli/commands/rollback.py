@@ -59,6 +59,10 @@ def _print_dry_run(
     table.add_column("Reason", style="muted")
 
     for task in reversed(tasks):
+        if task.status is TaskStatus.ROLLED_BACK:
+            table.add_row(task.name, task.kind.value, "[muted]skip[/muted]", "already rolled back")
+            continue
+
         is_unchanged = task.result is not None and not task.result.changed
         is_held = not options.aggressive or task.kind not in (
             TaskKind.PACKAGES_INSTALL,
@@ -167,6 +171,14 @@ def _execute_rollback(
     report = rollbacker.rollback()
 
     _print_report(console, report)
+
+    for task in executed:
+        if task.status is TaskStatus.ROLLED_BACK:
+            try:
+                store.save_task(TaskRecord.from_task(run_id, task))
+            except StateError:
+                pass
+
     return 0 if report.failed == 0 else 1
 
 

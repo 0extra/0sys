@@ -22,6 +22,7 @@ def check_command(
         user=user,
         port=port,
         ssh_key=ssh_key,
+        strict_host_key=False,
         dry_run=True,
         verbose=verbose,
         quiet=False,

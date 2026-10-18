@@ -53,6 +53,9 @@ class Rollbacker:
         for task in ordered:
             if not task.idempotent:
                 continue
+            if task.status is TaskStatus.ROLLED_BACK:
+                report.skipped += 1
+                continue
 
             if task.result is not None and not task.result.changed:
                 if not self.options.aggressive:

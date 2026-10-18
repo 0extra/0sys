@@ -16,6 +16,7 @@ class BackendContext:
         work_dir: str | None = None,
         dry_run: bool = False,
         verbose: bool = False,
+        strict_host_key: bool = False,
         extra: dict[str, Any] | None = None,
     ) -> None:
         self.target_host = target_host
@@ -25,6 +26,7 @@ class BackendContext:
         self.work_dir = work_dir
         self.dry_run = dry_run
         self.verbose = verbose
+        self.strict_host_key = strict_host_key
         self.extra: dict[str, Any] = extra or {}
 
     def as_connection_dict(self) -> dict[str, Any]:

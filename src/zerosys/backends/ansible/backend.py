@@ -99,6 +99,7 @@ class AnsibleBackend(Backend):
             ssh_key=context.ssh_key,
             roles_path=self.roles_path,
             verbose=context.verbose,
+            strict_host_key=context.strict_host_key,
         )
 
     def _convert_result(self, result: object) -> TaskResult:

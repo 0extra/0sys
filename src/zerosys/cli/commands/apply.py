@@ -91,6 +91,7 @@ def _apply_impl(
     user: str | None,
     port: int,
     ssh_key: str | None,
+    strict_host_key: bool,
     dry_run: bool,
     verbose: bool,
     quiet: bool,
@@ -159,6 +160,7 @@ def _apply_impl(
         ssh_key=ssh_key,
         dry_run=dry_run,
         verbose=verbose,
+        strict_host_key=strict_host_key,
     )
 
     context = ExecutionContext(plan=plan, backend_context=backend_context, options=options)
@@ -251,6 +253,9 @@ def apply_command(
     user: str | None = typer.Option(None, "--user", "-u", help="SSH user"),
     port: int = typer.Option(22, "--port", "-p", help="SSH port"),
     ssh_key: str | None = typer.Option(None, "--ssh-key", help="Path to SSH private key"),
+    strict_host_key: bool = typer.Option(
+        False, "--strict-host-key", help="Enforce strict SSH host key checking"
+    ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Do not change anything"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Show backend output"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress progress output"),
@@ -272,6 +277,7 @@ def apply_command(
         user=user,
         port=port,
         ssh_key=ssh_key,
+        strict_host_key=strict_host_key,
         dry_run=dry_run,
         verbose=verbose,
         quiet=quiet,

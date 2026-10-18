@@ -22,9 +22,8 @@ SENSITIVE_KEYS: frozenset[str] = frozenset(
     }
 )
 
-_SENSITIVE_PATTERN = re.compile(
-    r"\b(" + "|".join(re.escape(key) for key in sorted(SENSITIVE_KEYS)) + r")=(\S+)",
-    re.IGNORECASE,
+_SECRETS_REGEX = re.compile(
+    r"(?i)(\b(?:password|passwd|secret|token|api_key|apikey|access_key|private_key|privatekey|ssh_key|passphrase)\b\s*[:=]\s*[\"']?)([^\"'\s]+)([\"']?)"
 )
 
 
@@ -43,8 +42,12 @@ class Secret:
         return f"Secret(name={self.name!r}, value={str(self)!r})"
 
 
+def _normalize_key(key: str) -> str:
+    return key.strip().lower().replace("-", "_")
+
+
 def is_sensitive_key(key: str) -> bool:
-    return key.strip().lower() in SENSITIVE_KEYS
+    return _normalize_key(key) in SENSITIVE_KEYS
 
 
 def redact_dict(data: dict[str, Any]) -> dict[str, Any]:
@@ -75,11 +78,12 @@ def _redact_list(items: list[Any]) -> list[Any]:
 
 def redact_text(text: str) -> str:
     def _replace(match: re.Match[str]) -> str:
-        key = match.group(1)
+        prefix = match.group(1)
         value = match.group(2)
-        return f"{key}={mask_secret(value)}"
+        suffix = match.group(3)
+        return f"{prefix}{mask_secret(value)}{suffix}"
 
-    return _SENSITIVE_PATTERN.sub(_replace, text)
+    return _SECRETS_REGEX.sub(_replace, text)
 
 
 @dataclass
