@@ -7,7 +7,9 @@ from zerosys.backends.registry import get_backend
 from zerosys.core.errors import RollbackError
 from zerosys.core.executor.context import ExecutionContext
 from zerosys.core.executor.state import ExecutionState
-from zerosys.core.planner.task import Task, TaskResult, TaskStatus
+from zerosys.core.planner.task import Task, TaskKind, TaskResult, TaskStatus
+
+HELD_WITHOUT_AGGRESSIVE: frozenset[TaskKind] = frozenset({TaskKind.PACKAGES_INSTALL, TaskKind.USER})
 
 
 @dataclass
@@ -51,6 +53,10 @@ class Rollbacker:
         for task in ordered:
             if not task.idempotent:
                 continue
+            if task.result is not None and not task.result.changed:
+                report.skipped += 1
+                continue
+
             backend = self._backend_for(task)
             if backend is None:
                 report.not_reversible.append(task.name)
@@ -58,7 +64,7 @@ class Rollbacker:
             if not backend.can_rollback(task):
                 report.not_reversible.append(task.name)
                 continue
-            if task.kind.value == "packages.install" and not self.options.aggressive:
+            if task.kind in HELD_WITHOUT_AGGRESSIVE and not self.options.aggressive:
                 report.not_reversible.append(task.name)
                 continue
 

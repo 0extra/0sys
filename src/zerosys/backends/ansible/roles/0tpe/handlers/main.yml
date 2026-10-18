@@ -2,5 +2,3 @@
   community.docker.docker_compose_v2:
     project_src: "{{ proxy_install_dir }}"
     state: restarted
-  become: true
-  become_user: "{{ proxy_user }}"

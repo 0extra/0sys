@@ -6,11 +6,8 @@ import typer
 
 from zerosys.cli.commands.apply import _apply_impl
 
-app = typer.Typer(help="Dry-run a configuration without changing anything")
 
-
-@app.callback(invoke_without_command=True)
-def run(
+def check_command(
     config: Path = typer.Argument(..., exists=True, readable=True),
     host: str = typer.Option("localhost", "--host", "-H"),
     user: str | None = typer.Option(None, "--user", "-u"),

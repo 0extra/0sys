@@ -5,14 +5,11 @@ import sys
 import typer
 
 from zerosys.cli.commands import (
-    apply as apply_cmd,
-)
-from zerosys.cli.commands import (
-    check as check_cmd,
-)
-from zerosys.cli.commands import (
+    apply_command,
+    check_command,
     cloud_init_command,
     nixos_command,
+    plan_command,
     proxy_client_config_command,
     proxy_fetch_certs_command,
     proxy_server_info_command,
@@ -34,9 +31,6 @@ from zerosys.cli.commands import (
 )
 from zerosys.cli.commands import (
     init as init_cmd,
-)
-from zerosys.cli.commands import (
-    plan as plan_cmd,
 )
 from zerosys.cli.commands import (
     tips as tips_cmd,
@@ -71,16 +65,13 @@ proxy_app.command(
 )(proxy_fetch_certs_command)
 
 
-app.add_typer(plan_cmd.app, name="plan", help="Show what 0sys would do")
-app.add_typer(apply_cmd.app, name="apply", help="Apply a configuration")
-app.add_typer(check_cmd.app, name="check", help="Dry-run a configuration")
-app.add_typer(doctor_cmd.app, name="doctor", help="Check environment for missing pieces")
-app.add_typer(examples_cmd.app, name="examples", help="Show example configurations")
-app.add_typer(explain_cmd.app, name="explain", help="Explain a configuration in plain English")
-app.add_typer(init_cmd.app, name="init", help="Create a starter configuration file")
-app.add_typer(explain_term_cmd.app, name="explain-term", help="Explain a technical term")
-app.add_typer(tips_cmd.app, name="tips", help="Show practical tips")
-app.add_typer(proxy_app, name="0tpe", help="0TPE proxy server helpers")
+app.command("plan", help="Show what 0sys would do")(plan_command)
+app.command("apply", help="Apply a configuration")(apply_command)
+app.command("check", help="Dry-run a configuration")(check_command)
+app.command(
+    "rollback",
+    help="Inspect past runs and roll back safe operations",
+)(rollback_command)
 app.command(
     "cloud-init",
     help="Generate cloud-init user-data for a VPS provider",
@@ -93,10 +84,14 @@ app.command(
     "nixos",
     help="Generate a NixOS configuration.nix from the config",
 )(nixos_command)
-app.command(
-    "rollback",
-    help="Inspect past runs and roll back safe operations",
-)(rollback_command)
+
+app.add_typer(doctor_cmd.app, name="doctor", help="Check environment for missing pieces")
+app.add_typer(examples_cmd.app, name="examples", help="Show example configurations")
+app.add_typer(explain_cmd.app, name="explain", help="Explain a configuration in plain English")
+app.add_typer(init_cmd.app, name="init", help="Create a starter configuration file")
+app.add_typer(explain_term_cmd.app, name="explain-term", help="Explain a technical term")
+app.add_typer(tips_cmd.app, name="tips", help="Show practical tips")
+app.add_typer(proxy_app, name="0tpe", help="0TPE proxy server helpers")
 
 
 def _version_callback(value: bool) -> None:

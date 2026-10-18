@@ -2,7 +2,7 @@ proxy_port: 8443
 proxy_sni: www.microsoft.com
 proxy_max_connections: 512
 proxy_log_level: info
-proxy_version: "0.1.5"
+proxy_version: "0.1.8"
 proxy_commit_sha: ""
 proxy_install_dir: /opt/0tpe
 proxy_repo_url: https://github.com/0extra/0TPE.git

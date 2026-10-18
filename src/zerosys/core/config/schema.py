@@ -13,6 +13,17 @@ InfrastructureProvider = Literal["hetzner", "digitalocean"]
 ProxyRuntime = Literal["docker"]
 ProxyLogLevel = Literal["debug", "info", "warn", "error"]
 
+_NAME_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.")
+_HOSTNAME_CHARS = set("abcdefghijklmnopqrstuvwxyz0123456789.-")
+
+
+def _check_ssh_key_line(v: str | None) -> str | None:
+    if v is None:
+        return v
+    if "\n" in v or "\r" in v:
+        raise ValueError("ssh_key must be a single line")
+    return v.strip()
+
 
 class ServerConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
@@ -31,8 +42,7 @@ class ServerConfig(BaseModel):
             raise ValueError("hostname cannot start or end with a dash")
         if ".." in v:
             raise ValueError("hostname cannot contain consecutive dots")
-        allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-")
-        if not set(v).issubset(allowed):
+        if not set(v).issubset(_HOSTNAME_CHARS):
             raise ValueError("hostname contains invalid characters")
         return v.lower()
 
@@ -47,6 +57,14 @@ class PackagesConfig(BaseModel):
     @classmethod
     def _deduplicate(cls, v: list[str]) -> list[str]:
         return list(dict.fromkeys(v))
+
+    @field_validator("install", "remove")
+    @classmethod
+    def _validate_packages(cls, v: list[str]) -> list[str]:
+        for name in v:
+            if not name or not set(name).issubset(_NAME_CHARS) or name[0] == "-":
+                raise ValueError(f"invalid package name: {name!r}")
+        return v
 
 
 class ServiceConfig(BaseModel):
@@ -77,8 +95,24 @@ class UserConfig(BaseModel):
 
     @field_validator("groups")
     @classmethod
-    def _deduplicate_groups(cls, v: list[str]) -> list[str]:
-        return list(dict.fromkeys(v))
+    def _deduplicate_and_validate_groups(cls, v: list[str]) -> list[str]:
+        groups = list(dict.fromkeys(v))
+        for group in groups:
+            if not group or group[0] == "-" or not set(group).issubset(_NAME_CHARS):
+                raise ValueError(f"invalid group name: {group!r}")
+        return groups
+
+    @field_validator("ssh_key")
+    @classmethod
+    def _validate_ssh_key(cls, v: str | None) -> str | None:
+        return _check_ssh_key_line(v)
+
+    @field_validator("shell")
+    @classmethod
+    def _validate_shell(cls, v: str) -> str:
+        if not v.startswith("/") or any(c.isspace() for c in v):
+            raise ValueError("shell must be an absolute path without whitespace")
+        return v
 
 
 class FirewallConfig(BaseModel):
@@ -122,10 +156,24 @@ class ProxyConfig(BaseModel):
     sni: Annotated[str, Field(min_length=1, max_length=253)] = "www.microsoft.com"
     max_connections: Annotated[int, Field(ge=1, le=65535)] = 512
     log_level: ProxyLogLevel = "info"
-    version: str = "0.1.6"
+    version: str = "0.1.8"
     commit_sha: str | None = None
     install_dir: str = "/opt/0tpe"
     ssh_keys: list[str] = Field(default_factory=list)
+
+    @field_validator("ssh_keys")
+    @classmethod
+    def _deduplicate(cls, v: list[str]) -> list[str]:
+        return list(dict.fromkeys(v))
+
+    @field_validator("sni")
+    @classmethod
+    def _validate_sni(cls, v: str) -> str:
+        if v.startswith("-") or v.endswith("-") or ".." in v:
+            raise ValueError("sni must be a valid hostname")
+        if not set(v).issubset(_HOSTNAME_CHARS):
+            raise ValueError("sni contains invalid characters")
+        return v.lower()
 
     @field_validator("commit_sha")
     @classmethod
@@ -140,11 +188,6 @@ class ProxyConfig(BaseModel):
         if len(stripped) < 7:
             raise ValueError("commit_sha must be at least 7 characters")
         return stripped.lower()
-
-    @field_validator("ssh_keys")
-    @classmethod
-    def _deduplicate(cls, v: list[str]) -> list[str]:
-        return list(dict.fromkeys(v))
 
 
 class FileEntry(BaseModel):

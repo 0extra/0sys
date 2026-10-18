@@ -16,7 +16,7 @@ from zerosys.core.errors import StateError
 from zerosys.core.executor.context import ExecutionContext, ExecutionOptions
 from zerosys.core.executor.rollback import Rollbacker, RollbackOptions, RollbackReport
 from zerosys.core.executor.state import ExecutionState
-from zerosys.core.planner.task import Task, TaskKind, TaskStatus
+from zerosys.core.planner.task import Task, TaskKind, TaskResult, TaskStatus
 from zerosys.core.state import StateStore
 from zerosys.core.state.models import TaskRecord
 
@@ -43,6 +43,7 @@ def _task_from_record(record: TaskRecord) -> Task:
         params=dict(record.params),
     )
     task.status = record.status
+    task.result = TaskResult(status=record.status, changed=record.changed)
     return task
 
 
@@ -58,6 +59,14 @@ def _print_dry_run(
     table.add_column("Reason", style="muted")
 
     for task in reversed(tasks):
+        if task.result is not None and not task.result.changed:
+            table.add_row(
+                task.name,
+                task.kind.value,
+                "[muted]skip[/muted]",
+                "unchanged by this run",
+            )
+            continue
         if task.backend is None:
             table.add_row(task.name, task.kind.value, "[muted]skip[/muted]", "no backend")
             continue
@@ -71,12 +80,12 @@ def _print_dry_run(
             table.add_row(task.name, task.kind.value, "[muted]skip[/muted]", "not reversible")
             continue
 
-        if task.kind is TaskKind.PACKAGES_INSTALL and not options.aggressive:
+        if task.kind in (TaskKind.PACKAGES_INSTALL, TaskKind.USER) and not options.aggressive:
             table.add_row(
                 task.name,
                 task.kind.value,
                 "[warning]hold[/warning]",
-                "use --aggressive to remove packages",
+                "use --aggressive to remove packages and users",
             )
             continue
 
@@ -194,7 +203,7 @@ def rollback_command(
     aggressive: bool = typer.Option(
         False,
         "--aggressive",
-        help="Also remove packages that were installed",
+        help="Also remove packages and users created by the run (deletes data)",
     ),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
 ) -> None:

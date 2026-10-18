@@ -13,8 +13,6 @@ from zerosys.core.errors import ConfigError, PlannerError
 from zerosys.core.planner import build_plan
 from zerosys.core.planner.task import Task
 
-app = typer.Typer(help="Show what 0sys would do without changing anything")
-
 
 def _print_task_tree(task: Task, tree: Tree) -> None:
     label = kind_label(task.kind.value)
@@ -29,8 +27,7 @@ def _print_task_tree(task: Task, tree: Tree) -> None:
         node.add(Text(task.explain, style="hint"))
 
 
-@app.callback(invoke_without_command=True)
-def run(
+def plan_command(
     config: Path = typer.Argument(..., exists=True, readable=True, help="Path to config file"),
     backend: str | None = typer.Option(None, "--backend", help="Force a specific backend"),
     tags: str | None = typer.Option(None, "--tags", help="Comma-separated tags filter"),

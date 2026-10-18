@@ -63,6 +63,7 @@ class SshConnection:
             argv.extend(["-p", str(self.port)])
         if self.key_file is not None:
             argv.extend(["-i", str(self.key_file)])
+        argv.append("--")
         argv.append(self._target())
         argv.append(command)
         return argv
@@ -121,6 +122,7 @@ class SshConnection:
             argv.extend(["-P", str(self.port)])
         if self.key_file is not None:
             argv.extend(["-i", str(self.key_file)])
+        argv.append("--")
         argv.append(str(source))
         argv.append(f"{self._target()}:{remote}")
 

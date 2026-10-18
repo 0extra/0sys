@@ -8,6 +8,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from zerosys.core.planner.task import TaskKind, TaskResult, TaskStatus
+from zerosys.core.security.secrets import redact_dict, redact_text
 
 
 def _new_id() -> str:
@@ -157,11 +158,11 @@ class TaskRecord(BaseModel):
             backend=task.backend,
             status=task.status,
             message=result.message if result else "",
-            stdout=result.stdout if result else "",
-            stderr=result.stderr if result else "",
+            stdout=redact_text(result.stdout) if result else "",
+            stderr=redact_text(result.stderr) if result else "",
             changed=result.changed if result else False,
             duration_ms=result.duration_ms if result else 0,
             started_at=task.started_at.isoformat() if task.started_at else None,
             finished_at=task.finished_at.isoformat() if task.finished_at else None,
-            params=task.params,
+            params=redact_dict(dict(task.params)),
         )

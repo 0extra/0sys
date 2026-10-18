@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import sqlite3
 from collections.abc import Iterable
 from pathlib import Path
@@ -34,6 +35,8 @@ class StateStore:
         if self._conn is None:
             self._conn = sqlite3.connect(str(self.path), isolation_level=None)
             self._conn.row_factory = sqlite3.Row
+            with contextlib.suppress(OSError):
+                self.path.chmod(0o600)
             self._conn.execute("PRAGMA foreign_keys = ON")
             self._migrate()
         return self._conn
@@ -121,10 +124,7 @@ class StateStore:
 
     def get_run(self, run_id: str) -> RunRecord | None:
         conn = self.connect()
-        cursor = conn.execute(
-            f"SELECT {RUN_COLUMNS} FROM runs WHERE id = ?",
-            (run_id,),
-        )
+        cursor = conn.execute(f"SELECT {RUN_COLUMNS} FROM runs WHERE id = ?", (run_id,))
         row = cursor.fetchone()
         if row is None:
             return None

@@ -73,6 +73,7 @@ def run_remote(
         ssh_parts += ["-p", str(port)]
     if ssh_key:
         ssh_parts += ["-i", ssh_key]
+    ssh_parts.append("--")
     ssh_parts.append(target)
     ssh_parts.append(command)
 

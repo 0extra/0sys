@@ -4,6 +4,7 @@
     path: /etc/ssh/sshd_config
     regexp: "^#?PasswordAuthentication"
     line: "PasswordAuthentication no"
+    validate: "sshd -t -f %s"
   notify: restart sshd
 
 - name: Disable root login
@@ -11,4 +12,5 @@
     path: /etc/ssh/sshd_config
     regexp: "^#?PermitRootLogin"
     line: "PermitRootLogin no"
+    validate: "sshd -t -f %s"
   notify: restart sshd

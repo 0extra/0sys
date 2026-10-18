@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import contextlib
 import json
+import shlex
 import shutil
+import sys
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import yaml
+from platformdirs import user_data_dir
 
 from zerosys.core.errors import BackendError
 
@@ -32,6 +36,7 @@ class AnsibleRunner:
         roles_path: Path | None = None,
         work_dir: Path | None = None,
         verbose: bool = False,
+        known_hosts_file: Path | None = None,
     ) -> None:
         self.inventory_host = inventory_host
         self.inventory_user = inventory_user
@@ -40,6 +45,7 @@ class AnsibleRunner:
         self.roles_path = roles_path
         self.work_dir = work_dir
         self.verbose = verbose
+        self.known_hosts_file = known_hosts_file
 
     def run(
         self,
@@ -81,17 +87,31 @@ class AnsibleRunner:
             return self._convert(result)
 
     def _build_inventory(self) -> dict[str, Any]:
+        is_local = self.inventory_host in ("localhost", "127.0.0.1", "::1")
         host_vars: dict[str, Any] = {}
-        if self.inventory_user:
-            host_vars["ansible_user"] = self.inventory_user
-        if self.inventory_port != 22:
-            host_vars["ansible_port"] = self.inventory_port
-        if self.ssh_key:
-            host_vars["ansible_ssh_private_key_file"] = self.ssh_key
-        host_vars["ansible_python_interpreter"] = "auto_silent"
-        host_vars["ansible_ssh_common_args"] = (
-            "-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null"
-        )
+
+        if is_local:
+            host_vars["ansible_connection"] = "local"
+            host_vars["ansible_python_interpreter"] = sys.executable
+        else:
+            if self.inventory_user:
+                host_vars["ansible_user"] = self.inventory_user
+            if self.inventory_port != 22:
+                host_vars["ansible_port"] = self.inventory_port
+            if self.ssh_key:
+                host_vars["ansible_ssh_private_key_file"] = self.ssh_key
+            host_vars["ansible_python_interpreter"] = "auto_silent"
+
+            known_hosts = self.known_hosts_file or (
+                Path(user_data_dir("0sys", "0extra")) / "known_hosts"
+            )
+            with contextlib.suppress(OSError):
+                known_hosts.parent.mkdir(parents=True, exist_ok=True)
+
+            host_vars["ansible_ssh_common_args"] = (
+                "-o StrictHostKeyChecking=accept-new "
+                f"-o UserKnownHostsFile={shlex.quote(str(known_hosts))}"
+            )
 
         return {
             "all": {
@@ -115,7 +135,7 @@ class AnsibleRunner:
         env_dir = project_dir / "env"
         env_dir.mkdir(parents=True, exist_ok=True)
         settings: dict[str, Any] = {
-            "host_key_checking": False,
+            "host_key_checking": True,
             "retry_files_enabled": False,
             "stdout_callback": "default",
             "gathering": "smart",

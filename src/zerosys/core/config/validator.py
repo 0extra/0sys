@@ -67,10 +67,11 @@ COMMON_SERVICES = {
 }
 
 
-def validate(config: Config) -> ValidationReport:
+def validate(config: Config, connect_port: int | None = None) -> ValidationReport:
     report = ValidationReport()
 
     _check_firewall_ssh_lockout(config, report)
+    _check_connection_port_lockout(config, report, connect_port)
     _check_firewall_defaults(config, report)
     _check_services_without_firewall_ports(config, report)
     _check_users(config, report)
@@ -103,6 +104,31 @@ def _check_firewall_ssh_lockout(config: Config, report: ValidationReport) -> Non
                 message=(
                     f"firewall default is deny but SSH port {ssh_port} is not allowed; "
                     "this will lock you out of the server"
+                ),
+                path="firewall.allow",
+            )
+        )
+
+
+def _check_connection_port_lockout(
+    config: Config,
+    report: ValidationReport,
+    connect_port: int | None,
+) -> None:
+    if connect_port is None or config.firewall is None:
+        return
+    if config.firewall.default == "allow":
+        return
+    if connect_port == _resolve_ssh_port(config):
+        return
+    if connect_port not in config.firewall.allow:
+        report.add(
+            ValidationIssue(
+                severity=Severity.ERROR,
+                code="FW005",
+                message=(
+                    f"you are connecting over SSH port {connect_port}, but the firewall "
+                    "does not allow it; applying this config would cut your own connection"
                 ),
                 path="firewall.allow",
             )

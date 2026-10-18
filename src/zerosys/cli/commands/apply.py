@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
+from typing import Any
 
 import typer
 from platformdirs import user_data_dir
+from rich.console import Console
 from rich.text import Text
 
 from zerosys.backends.base import BackendContext
@@ -25,8 +27,6 @@ from zerosys.core.planner.task import Task, TaskStatus
 from zerosys.core.state import StateStore
 from zerosys.core.state.models import RunRecord, TaskRecord
 
-app = typer.Typer(help="Apply a configuration to the target host")
-
 
 def _hash_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
@@ -34,6 +34,55 @@ def _hash_text(text: str) -> str:
 
 def _default_state_path() -> Path:
     return Path(user_data_dir("0sys", "0extra")) / "state.db"
+
+
+LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+def _persist_task(
+    store: StateStore | None,
+    run_record: RunRecord | None,
+    task: Task,
+    saved_ids: set[str],
+    console: Console,
+    include_unfinished: bool = False,
+) -> None:
+    if store is None or run_record is None or task.id in saved_ids:
+        return
+    if not include_unfinished and task.status in (TaskStatus.PENDING, TaskStatus.RUNNING):
+        return
+    try:
+        store.save_task(TaskRecord.from_task(run_record.id, task))
+    except StateError as exc:
+        console.print(Text(f"Failed to persist task state: {exc}", style="warning"))
+        return
+    saved_ids.add(task.id)
+
+
+def _finalize_run(
+    store: StateStore | None,
+    run_record: RunRecord | None,
+    plan: Any,
+    saved_ids: set[str],
+    console: Console,
+    status: TaskStatus,
+) -> None:
+    if store is None or run_record is None:
+        return
+    tasks = list(plan.tasks())
+    run_record.total_tasks = len(tasks)
+    run_record.successful_tasks = sum(1 for t in tasks if t.status is TaskStatus.SUCCESS)
+    run_record.failed_tasks = sum(1 for t in tasks if t.status is TaskStatus.FAILED)
+    run_record.skipped_tasks = sum(1 for t in tasks if t.status is TaskStatus.SKIPPED)
+    run_record.finish(status)
+    try:
+        store.update_run(run_record)
+        for task in tasks:
+            _persist_task(store, run_record, task, saved_ids, console, include_unfinished=True)
+    except StateError as exc:
+        console.print(Text(f"Failed to persist state: {exc}", style="warning"))
+    finally:
+        store.close()
 
 
 def _apply_impl(
@@ -61,7 +110,7 @@ def _apply_impl(
         console.print(Text(str(exc), style="error"))
         raise typer.Exit(code=1) from exc
 
-    report = validate(cfg)
+    report = validate(cfg, connect_port=port)
     for issue in report.issues:
         style = {"error": "error", "warning": "warning", "info": "info"}.get(
             issue.severity.value, "muted"
@@ -77,6 +126,12 @@ def _apply_impl(
     except PlannerError as exc:
         console.print(Text(str(exc), style="error"))
         raise typer.Exit(code=1) from exc
+
+    if host in LOCAL_HOSTS and not dry_run:
+        console.print(
+            "[warning]Target is this computer (localhost): "
+            "the configuration will change THIS machine.[/warning]"
+        )
 
     if not yes and not dry_run:
         console.print(f"[warning]About to apply {plan.size()} task(s) to {host}[/warning]")
@@ -113,20 +168,6 @@ def _apply_impl(
     else:
         reporter = ProgressReporter(console=console, total=plan.size(), description="Applying")
 
-    def on_start(task: Task) -> None:
-        if not quiet:
-            print_task_start(task, console)
-
-    def on_finish(task: Task) -> None:
-        if quiet:
-            return
-        print_task_finish(task, console)
-        if task.status is TaskStatus.FAILED:
-            print_task_error(task, console)
-        reporter.advance(task)
-
-    executor = Executor(context, on_task_start=on_start, on_task_finish=on_finish)
-
     store: StateStore | None = None
     run_record: RunRecord | None = None
 
@@ -147,28 +188,41 @@ def _apply_impl(
             store = None
             run_record = None
 
+    saved_ids: set[str] = set()
+
+    def on_start(task: Task) -> None:
+        if not quiet:
+            print_task_start(task, console)
+
+    def on_finish(task: Task) -> None:
+        _persist_task(store, run_record, task, saved_ids, console)
+        if quiet:
+            return
+        print_task_finish(task, console)
+        if task.status is TaskStatus.FAILED:
+            print_task_error(task, console)
+        reporter.advance(task)
+
+    executor = Executor(context, on_task_start=on_start, on_task_finish=on_finish)
+
     try:
         state = executor.execute()
-    except ExecutorError as exc:
+    except (ExecutorError, KeyboardInterrupt) as exc:
+        reporter.stop()
+        _finalize_run(store, run_record, plan, saved_ids, console, TaskStatus.FAILED)
+
+        if isinstance(exc, KeyboardInterrupt):
+            print_error(
+                "Interrupted. Finished tasks were saved; see '0sys rollback --list'.",
+                console,
+            )
+            raise typer.Exit(code=130) from exc
+
         print_error(str(exc), console)
         raise typer.Exit(code=1) from exc
 
     reporter.stop()
-
-    if store is not None and run_record is not None:
-        run_record.total_tasks = state.total
-        run_record.successful_tasks = state.successful
-        run_record.failed_tasks = state.failed
-        run_record.skipped_tasks = state.skipped
-        run_record.finish(state.final_status())
-        try:
-            store.update_run(run_record)
-            task_records = [TaskRecord.from_task(run_record.id, t) for t in plan.tasks()]
-            store.save_tasks(task_records)
-        except StateError as exc:
-            console.print(Text(f"Failed to persist state: {exc}", style="warning"))
-        finally:
-            store.close()
+    _finalize_run(store, run_record, plan, saved_ids, console, state.final_status())
 
     if state.has_failures():
         print_error(f"Apply finished with failures: {state.summary()}", console)
@@ -177,8 +231,7 @@ def _apply_impl(
     print_success(f"Apply finished: {state.summary()}", console)
 
 
-@app.callback(invoke_without_command=True)
-def run(
+def apply_command(
     config: Path = typer.Argument(..., exists=True, readable=True, help="Path to config file"),
     host: str = typer.Option("localhost", "--host", "-H", help="Target host"),
     user: str | None = typer.Option(None, "--user", "-u", help="SSH user"),

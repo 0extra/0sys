@@ -13,13 +13,24 @@
         ansible-galaxy collection install community.docker
   when: proxy_collection_check.rc != 0
 
-- name: Install Docker packages (Debian)
+- name: Install Docker engine (Debian)
   ansible.builtin.package:
-    name:
-      - docker.io
-      - docker-compose-plugin
+    name: docker.io
     state: present
   when: ansible_facts['os_family'] == "Debian"
+
+- name: Install Docker Compose v2 plugin (Debian)
+  when: ansible_facts['os_family'] == "Debian"
+  block:
+    - name: Try the distribution package docker-compose-v2
+      ansible.builtin.package:
+        name: docker-compose-v2
+        state: present
+  rescue:
+    - name: Fall back to docker-compose-plugin (Docker's own repository)
+      ansible.builtin.package:
+        name: docker-compose-plugin
+        state: present
 
 - name: Install Docker packages (RedHat)
   ansible.builtin.package:
@@ -58,12 +69,6 @@
     create_home: true
     system: true
     state: present
-
-- name: Add proxy user to docker group
-  ansible.builtin.user:
-    name: "{{ proxy_user }}"
-    groups: docker
-    append: true
 
 - name: Create install directory
   ansible.builtin.file:
@@ -145,8 +150,6 @@
     project_src: "{{ proxy_install_dir }}"
     build: always
     state: present
-  become: true
-  become_user: "{{ proxy_user }}"
   register: proxy_build
   changed_when: "'BUILD' in (proxy_build.stdout | default(''))"
 
@@ -155,5 +158,3 @@
     project_src: "{{ proxy_install_dir }}"
     state: present
     recreate: auto
-  become: true
-  become_user: "{{ proxy_user }}"
