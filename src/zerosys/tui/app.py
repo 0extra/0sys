@@ -4,10 +4,12 @@ import contextlib
 from pathlib import Path
 from typing import Any, ClassVar
 
+from platformdirs import user_data_dir
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
+from textual.screen import ModalScreen
 from textual.widgets import Button, Footer, Header, Input, Label, RichLog
 
 from zerosys.backends.base import BackendContext
@@ -23,6 +25,47 @@ from zerosys.core.state import StateStore
 from zerosys.core.state.models import RunRecord, TaskRecord
 
 BindingType = Binding | tuple[str, str] | tuple[str, str, str]
+
+
+def _default_state_path() -> Path:
+    return Path(user_data_dir("0sys", "0extra")) / "state.db"
+
+
+class ConfirmScreen(ModalScreen[bool]):
+    CSS = """
+    ConfirmScreen {
+        align: center middle;
+    }
+    #confirm-dialog {
+        width: 64;
+        height: auto;
+        border: thick $error;
+        background: $surface;
+        padding: 1 2;
+    }
+    #confirm-buttons {
+        height: auto;
+        align: right middle;
+        margin-top: 1;
+    }
+    #confirm-buttons Button {
+        margin-left: 1;
+    }
+    """
+
+    def __init__(self, message: str) -> None:
+        super().__init__()
+        self.message = message
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="confirm-dialog"):
+            yield Label(self.message)
+            with Horizontal(id="confirm-buttons"):
+                yield Button("Cancel", id="confirm-cancel", variant="default")
+                yield Button("Apply", id="confirm-accept", variant="error")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss(event.button.id == "confirm-accept")
 
 
 class ZeroSysTUI(App[None]):
@@ -122,39 +165,64 @@ class ZeroSysTUI(App[None]):
                 yield RichLog(id="log", highlight=True, markup=True)
         yield Footer()
 
+    def _get_log(self) -> RichLog:
+        return self.query_one("#log", RichLog)
+
+    def _target_host(self) -> str:
+        return self.query_one("#target-host", Input).value.strip() or "localhost"
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        log = self.query_one("#log", RichLog)
-
-        if event.button.id == "btn-load":
-            path_input = self.query_one("#config-path", Input)
-            self.config_path = Path(path_input.value)
-
-            if not self.config_path.exists():
-                log.write(f"[error]File not found: {self.config_path}[/error]")
-                return
-
-            try:
-                self.current_config = load_config(self.config_path)
-                log.write(f"[success]Loaded config: {self.config_path}[/success]")
-                log.write(f"Version: {self.current_config.version}")
-
-                self.query_one("#btn-plan", Button).disabled = False
-                self.query_one("#btn-check", Button).disabled = False
-                self.query_one("#btn-apply", Button).disabled = False
-            except Exception as exc:
-                log.write(f"[error]Failed to load config: {exc}[/error]")
-
-        elif event.button.id == "btn-plan" and self.current_config:
+        button_id = event.button.id
+        if button_id == "btn-load":
+            self._handle_load()
+        elif button_id == "btn-plan" and self.current_config:
             self._run_plan()
+        elif button_id == "btn-check" and self.current_config:
+            self._run_check(self._get_log())
+        elif button_id == "btn-apply" and self.current_config:
+            self._handle_apply_click()
 
-        elif event.button.id == "btn-check" and self.current_config:
-            self._run_check()
+    def _handle_load(self) -> None:
+        log = self._get_log()
+        path_input = self.query_one("#config-path", Input)
+        self.config_path = Path(path_input.value)
 
-        elif event.button.id == "btn-apply" and self.current_config:
-            self._run_apply()
+        if not self.config_path.exists():
+            log.write(f"[error]File not found: {self.config_path}[/error]")
+            return
+
+        try:
+            self.current_config = load_config(self.config_path)
+        except Exception as exc:
+            log.write(f"[error]Failed to load config: {exc}[/error]")
+            return
+
+        log.write(f"[success]Loaded config: {self.config_path}[/success]")
+        log.write(f"Version: {self.current_config.version}")
+        self.query_one("#btn-plan", Button).disabled = False
+        self.query_one("#btn-check", Button).disabled = False
+        self.query_one("#btn-apply", Button).disabled = False
+
+    def _handle_apply_click(self) -> None:
+        target = self._target_host()
+        message = (
+            f"Apply {self.config_path} to {target}?\n\n"
+            "This will modify the target system. Review the plan first."
+        )
+        log = self._get_log()
+        self.push_screen(
+            ConfirmScreen(message),
+            lambda confirmed: self._on_apply_confirmed(confirmed, log),
+        )
+
+    def _on_apply_confirmed(self, confirmed: bool | None, log: RichLog) -> None:
+        if confirmed:
+            self._run_apply(log)
+        else:
+            log.write("[muted]Apply cancelled.[/muted]")
 
     def _run_plan(self) -> None:
-        log = self.query_one("#log", RichLog)
+        log = self._get_log()
         log.write("[primary]Building plan...[/primary]")
 
         config = self.current_config
@@ -179,15 +247,14 @@ class ZeroSysTUI(App[None]):
             log.write(f"[error]Plan failed: {exc}[/error]")
 
     @work(thread=True)
-    def _run_check(self) -> None:
-        self._execute(dry_run=True)
+    def _run_check(self, log: RichLog) -> None:
+        self._execute(dry_run=True, log=log)
 
     @work(thread=True)
-    def _run_apply(self) -> None:
-        self._execute(dry_run=False)
+    def _run_apply(self, log: RichLog) -> None:
+        self._execute(dry_run=False, log=log)
 
-    def _execute(self, dry_run: bool) -> None:
-        log = self.query_one("#log", RichLog)
+    def _execute(self, dry_run: bool, log: RichLog) -> None:
         mode = "[warning]CHECK (DRY-RUN)[/warning]" if dry_run else "[error]APPLY[/error]"
         self.call_from_thread(log.write, f"Starting {mode}...")
 
@@ -202,41 +269,45 @@ class ZeroSysTUI(App[None]):
             return
 
         plan = build_plan(config)
-        host_input = self.query_one("#target-host", Input)
-        target_host = host_input.value.strip() or "localhost"
+        target_host = self._target_host()
 
         backend_ctx = BackendContext(target_host=target_host, dry_run=dry_run)
         options = ExecutionOptions(dry_run=dry_run)
         context = ExecutionContext(plan=plan, backend_context=backend_ctx, options=options)
 
-        store, run_record = None, None
+        store: StateStore | None = None
+        run_record: RunRecord | None = None
         if not dry_run:
-            store, run_record = self._setup_state(plan, target_host)
+            store, run_record, error = self._setup_state(plan, target_host)
             if store is None:
-                msg = "[error]State store unavailable. Apply aborted.[/error]"
-                self.call_from_thread(log.write, msg)
+                self.call_from_thread(
+                    log.write,
+                    f"[error]State store unavailable: {error}. Apply aborted.[/error]",
+                )
                 return
 
         state = self._run_executor(context, store, run_record, log)
         if state is None:
+            if store is not None:
+                store.close()
             return
 
         if state.has_failures():
-            msg = f"[error]Finished with failures: {state.summary()}[/error]"
-            self.call_from_thread(log.write, msg)
+            self.call_from_thread(
+                log.write, f"[error]Finished with failures: {state.summary()}[/error]"
+            )
         else:
-            msg = f"[success]Finished: {state.summary()}[/success]"
-            self.call_from_thread(log.write, msg)
+            self.call_from_thread(log.write, f"[success]Finished: {state.summary()}[/success]")
 
-        if store and run_record:
-            self._finalize_state(store, run_record, state)
+        if store is not None and run_record is not None:
+            self._finalize_state(store, run_record, state, log)
 
     def _setup_state(
         self, plan: Any, target_host: str
-    ) -> tuple[StateStore | None, RunRecord | None]:
-        state_path = Path.home() / ".local" / "share" / "0sys" / "state.db"
+    ) -> tuple[StateStore | None, RunRecord | None, str]:
+        store = StateStore(_default_state_path())
         try:
-            store = StateStore(state_path)
+            store.connect()
             run_record = RunRecord(
                 config_path=str(self.config_path.resolve()),
                 target_host=target_host,
@@ -244,9 +315,10 @@ class ZeroSysTUI(App[None]):
                 dry_run=False,
             )
             store.save_run(run_record)
-            return store, run_record
-        except Exception:
-            return None, None
+            return store, run_record, ""
+        except Exception as exc:
+            store.close()
+            return None, None, str(exc)
 
     def _run_executor(
         self,
@@ -285,14 +357,18 @@ class ZeroSysTUI(App[None]):
         store: StateStore,
         run_record: RunRecord,
         state: ExecutionState,
+        log: RichLog,
     ) -> None:
         run_record.successful_tasks = state.successful
         run_record.failed_tasks = state.failed
         run_record.skipped_tasks = state.skipped
         run_record.finish(state.final_status())
-        with contextlib.suppress(Exception):
+        try:
             store.update_run(run_record)
-        store.close()
+        except Exception as exc:
+            self.call_from_thread(log.write, f"[warning]Failed to save run: {exc}[/warning]")
+        finally:
+            store.close()
 
 
 def run_tui() -> None:

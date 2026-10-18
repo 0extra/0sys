@@ -3,15 +3,47 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
+from rich.console import Console
+from rich.table import Table
 from rich.text import Text
 
 from zerosys.cli.ui.theme import get_console
 from zerosys.connection.local import LocalConnection
 from zerosys.connection.ssh import SshConnection
 from zerosys.core.audit import AuditScanner
+from zerosys.core.audit.scanner import AuditResult, DiscoveryStatus
 from zerosys.core.config.parser import write_config
 
 DEFAULT_OUTPUT = Path("audited-config.yaml")
+
+_STATUS_STYLES: dict[DiscoveryStatus, str] = {
+    DiscoveryStatus.SUCCESS: "success",
+    DiscoveryStatus.PARTIAL: "warning",
+    DiscoveryStatus.FAILED: "error",
+    DiscoveryStatus.UNSUPPORTED: "muted",
+}
+
+
+def _render_discovery_table(console: Console, result: AuditResult) -> None:
+    table = Table(title="Discovery summary", border_style="primary")
+    table.add_column("Source", style="task.kind")
+    table.add_column("Status")
+    table.add_column("Count", style="muted")
+    table.add_column("Detail", style="muted")
+    for name, discovered in (
+        ("packages", result.packages),
+        ("services", result.services),
+        ("users", result.users),
+        ("firewall", result.firewall_ports),
+    ):
+        style = _STATUS_STYLES[discovered.status]
+        table.add_row(
+            name,
+            f"[{style}]{discovered.status.value}[/{style}]",
+            str(discovered.count()),
+            discovered.detail,
+        )
+    console.print(table)
 
 
 def audit_command(
@@ -63,7 +95,7 @@ def audit_command(
 
     try:
         scanner = AuditScanner(conn)
-        config = scanner.scan()
+        config, result = scanner.scan()
     except Exception as exc:
         console.print(Text(f"Audit failed: {exc}", style="error"))
         raise typer.Exit(code=1) from exc
@@ -73,15 +105,17 @@ def audit_command(
     path = write_config(config, output)
 
     console.print(f"[success]Wrote {path}[/success]")
-    console.print(f"  Packages found: {len(config.packages.install) if config.packages else 0}")
-    console.print(f"  Services found: {len(config.services)}")
-    console.print(f"  Users found:    {len(config.users)}")
     console.print("")
+    _render_discovery_table(console, result)
 
-    warning_msg = (
-        "WARNING: This is a partial snapshot. Packages are limited to 50, "
-        "services to 20. Firewall rules are inferred from UFW and may be incomplete. "
-        "Users are created without sudo by default."
+    if result.warnings:
+        console.print("")
+        console.print("[warning]Warnings:[/warning]")
+        for warning in result.warnings:
+            console.print(f"  [warning]•[/warning] {warning}")
+
+    console.print("")
+    console.print(
+        "[warning]This is a partial snapshot. Review carefully before '0sys apply'.[/warning]"
     )
-    console.print(f"[warning]{warning_msg}[/warning]")
-    console.print("[hint]Review the file carefully before running '0sys apply'.[/hint]")
+    console.print("[hint]Users are created without sudo by default.[/hint]")
