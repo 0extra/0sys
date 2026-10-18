@@ -31,4 +31,5 @@ def check_command(
         rollback=False,
         state_path=None,
         yes=True,
+        force_no_state=True,
     )

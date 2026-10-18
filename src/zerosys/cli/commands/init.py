@@ -4,6 +4,7 @@ from pathlib import Path
 
 import typer
 
+from zerosys import wizard as wizard_module
 from zerosys.cli.ui.theme import get_console
 from zerosys.core.config import (
     DEFAULT_CONFIG_FILENAME,
@@ -12,7 +13,6 @@ from zerosys.core.config import (
     web_server_config,
     write_config,
 )
-from zerosys.wizard import run_wizard
 
 app = typer.Typer(help="Create a starter configuration file")
 
@@ -45,7 +45,7 @@ def run(
     console = get_console()
 
     if preset is None:
-        run_wizard(output=output)
+        wizard_module.run_wizard(output=output)
         return
 
     if preset not in PRESETS:

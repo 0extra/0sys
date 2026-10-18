@@ -59,7 +59,13 @@ def _print_dry_run(
     table.add_column("Reason", style="muted")
 
     for task in reversed(tasks):
-        if task.result is not None and not task.result.changed:
+        is_unchanged = task.result is not None and not task.result.changed
+        is_held = not options.aggressive or task.kind not in (
+            TaskKind.PACKAGES_INSTALL,
+            TaskKind.USER,
+        )
+
+        if is_unchanged and is_held:
             table.add_row(
                 task.name,
                 task.kind.value,
@@ -67,6 +73,7 @@ def _print_dry_run(
                 "unchanged by this run",
             )
             continue
+
         if task.backend is None:
             table.add_row(task.name, task.kind.value, "[muted]skip[/muted]", "no backend")
             continue
@@ -107,9 +114,9 @@ def _print_report(console: Console, report: RollbackReport) -> None:
 def _execute_rollback(
     run_id: str,
     store: StateStore,
-    host: str,
+    host: str | None,
     user: str | None,
-    port: int,
+    port: int | None,
     ssh_key: str | None,
     dry_run: bool,
     aggressive: bool,
@@ -136,10 +143,13 @@ def _execute_rollback(
     if dry_run:
         return _print_dry_run(console, executed, rollback_options)
 
+    target_host = host if host is not None else record.target_host
+    target_user = user if user is not None else record.target_user
+
     backend_context = BackendContext(
-        target_host=host,
-        target_user=user,
-        target_port=port,
+        target_host=target_host,
+        target_user=target_user,
+        target_port=port if port is not None else 22,
         ssh_key=ssh_key,
         dry_run=False,
     )
@@ -190,9 +200,14 @@ def rollback_command(
         "--state-path",
         help="Custom path to state database",
     ),
-    host: str = typer.Option("localhost", "--host", "-H", help="Target host"),
+    host: str | None = typer.Option(
+        None,
+        "--host",
+        "-H",
+        help="Target host (defaults to original run host)",
+    ),
     user: str | None = typer.Option(None, "--user", "-u", help="SSH user"),
-    port: int = typer.Option(22, "--port", "-p", help="SSH port"),
+    port: int | None = typer.Option(None, "--port", "-p", help="SSH port"),
     ssh_key: str | None = typer.Option(None, "--ssh-key", help="Path to SSH private key"),
     dry_run: bool = typer.Option(
         False,
@@ -222,7 +237,9 @@ def rollback_command(
         raise typer.Exit(code=0)
 
     if not dry_run and not yes:
-        console.print(f"[warning]About to roll back run {run_id} on {host}.[/warning]")
+        record = store.get_run(run_id)
+        target_host = host if host is not None else (record.target_host if record else "unknown")
+        console.print(f"[warning]About to roll back run {run_id} on {target_host}.[/warning]")
         answer = typer.prompt("Type 'yes' to continue", default="no")
         if answer.strip().lower() != "yes":
             console.print("[muted]Aborted by user.[/muted]")

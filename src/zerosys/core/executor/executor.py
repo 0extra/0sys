@@ -26,17 +26,26 @@ class Executor:
         load_default_backends()
 
     def execute(self) -> ExecutionState:
+        failed = False
         for level in self.context.plan.levels():
             for task in level:
+                if failed:
+                    task.mark_skipped("previous task failed")
+                    self.state.register_skip(task)
+                    self._notify_finish(task)
+                    continue
+
                 if not self._matches_tags(task):
                     task.mark_skipped("tag filter")
                     self.state.register_skip(task)
                     self._notify_finish(task)
                     continue
+
                 self._execute_task(task)
+
                 if task.status is TaskStatus.FAILED and self.context.options.stop_on_failure:
-                    self._mark_remaining_skipped(level, task)
-                    return self.state
+                    failed = True
+
         return self.state
 
     def _execute_task(self, task: Task) -> None:
@@ -88,14 +97,6 @@ class Executor:
         if not task.tags:
             return False
         return bool(set(requested) & set(task.tags))
-
-    def _mark_remaining_skipped(self, level: list[Task], failed_task: Task) -> None:
-        start_index = level.index(failed_task) + 1
-        for task in level[start_index:]:
-            if task.status is TaskStatus.PENDING:
-                task.mark_skipped("previous task failed")
-                self.state.register_skip(task)
-                self._notify_finish(task)
 
     def _notify_start(self, task: Task) -> None:
         if self.on_task_start is not None:

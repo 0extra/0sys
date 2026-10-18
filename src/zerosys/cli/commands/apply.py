@@ -100,6 +100,7 @@ def _apply_impl(
     rollback: bool,
     state_path: Path | None,
     yes: bool,
+    force_no_state: bool,
 ) -> None:
     console = get_console()
 
@@ -162,12 +163,6 @@ def _apply_impl(
 
     context = ExecutionContext(plan=plan, backend_context=backend_context, options=options)
 
-    reporter: ProgressReporter | NullReporter
-    if quiet:
-        reporter = NullReporter()
-    else:
-        reporter = ProgressReporter(console=console, total=plan.size(), description="Applying")
-
     store: StateStore | None = None
     run_record: RunRecord | None = None
 
@@ -184,9 +179,28 @@ def _apply_impl(
             )
             store.save_run(run_record)
         except StateError as exc:
-            console.print(Text(f"State store unavailable: {exc}", style="warning"))
+            if not force_no_state:
+                console.print(Text(f"State store unavailable: {exc}", style="error"))
+                console.print(
+                    "[error]Aborted. Use --force-no-state to apply without saving history "
+                    "(rollback will be unavailable).[/error]"
+                )
+                raise typer.Exit(code=1) from exc
+
+            console.print(
+                Text(
+                    f"State store unavailable: {exc} (forcing apply without state)",
+                    style="warning",
+                )
+            )
             store = None
             run_record = None
+
+    reporter: ProgressReporter | NullReporter
+    if quiet:
+        reporter = NullReporter()
+    else:
+        reporter = ProgressReporter(console=console, total=plan.size(), description="Applying")
 
     saved_ids: set[str] = set()
 
@@ -246,6 +260,11 @@ def apply_command(
     rollback: bool = typer.Option(False, "--rollback", help="Rollback on failure"),
     state_path: Path | None = typer.Option(None, "--state-path", help="Custom state database path"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
+    force_no_state: bool = typer.Option(
+        False,
+        "--force-no-state",
+        help="Allow apply without saving state (rollback unavailable)",
+    ),
 ) -> None:
     _apply_impl(
         config=config,
@@ -262,4 +281,5 @@ def apply_command(
         rollback=rollback,
         state_path=state_path,
         yes=yes,
+        force_no_state=force_no_state,
     )

@@ -183,9 +183,11 @@ def proxy_client_config_command(
     ]
     target = output.expanduser().resolve()
     target.parent.mkdir(parents=True, exist_ok=True)
+    target.touch(mode=0o600, exist_ok=True)
+    target.chmod(0o600)
     target.write_text("\n".join(lines), encoding="utf-8")
 
-    console.print(f"[success]Wrote {target}[/success]")
+    console.print(f"[success]Wrote {target} (permissions: 0600)[/success]")
     console.print(
         "[hint]Copy this file along with certs/ (ca.crt, client.crt, client.key) "
         "to your client machine and run 'otpe-client client.conf'.[/hint]"

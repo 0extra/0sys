@@ -55,9 +55,25 @@ class StateStore:
             if version is None or version <= current:
                 continue
             sql = migration.read_text(encoding="utf-8")
+
+            statements: list[str] = []
+            buffer = ""
+            for line in sql.splitlines():
+                buffer += line + "\n"
+                if sqlite3.complete_statement(buffer):
+                    statements.append(buffer)
+                    buffer = ""
+            if buffer.strip():
+                statements.append(buffer)
+
             try:
-                self._conn.executescript(sql)
+                self._conn.execute("BEGIN")
+                for stmt in statements:
+                    self._conn.execute(stmt)
+                self._conn.execute("COMMIT")
             except sqlite3.Error as exc:
+                with contextlib.suppress(sqlite3.Error):
+                    self._conn.execute("ROLLBACK")
                 raise StateError(f"migration {migration.name} failed: {exc}") from exc
 
     def _current_version(self) -> int:

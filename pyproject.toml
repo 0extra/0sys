@@ -116,6 +116,7 @@ ignore = [
 "src/zerosys/cli/ui/progress.py" = ["ARG002"]
 "src/zerosys/backends/**/*.py" = ["ARG002", "PLC0415"]
 "src/zerosys/backends/ansible/generator.py" = ["PLR0911"]
+"src/zerosys/cli/commands/rollback.py" = ["PLR0912", "PLR0915"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["zerosys"]
