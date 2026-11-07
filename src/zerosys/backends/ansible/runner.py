@@ -88,8 +88,16 @@ class AnsibleRunner:
 
             return self._convert(result)
 
+    def _is_local_connection(self) -> bool:
+        return (
+            self.inventory_host in ("localhost", "127.0.0.1", "::1")
+            and self.inventory_port == 22
+            and self.ssh_key is None
+            and self.inventory_user is None
+        )
+
     def _build_inventory(self) -> dict[str, Any]:
-        is_local = self.inventory_host in ("localhost", "127.0.0.1", "::1")
+        is_local = self._is_local_connection()
         host_vars: dict[str, Any] = {}
 
         if is_local:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import re
 import shutil
 from pathlib import Path
 
@@ -18,6 +20,8 @@ ROLLBACK_KINDS: frozenset[TaskKind] = frozenset(
         TaskKind.PACKAGES_INSTALL,
     }
 )
+
+_RECAP_CHANGED_RE = re.compile(r"\bchanged=(\d+)\b")
 
 
 class AnsibleBackend(Backend):
@@ -110,13 +114,18 @@ class AnsibleBackend(Backend):
         stats = getattr(result, "stats", {}) or {}
         duration_ms = int(getattr(result, "duration_ms", 0))
 
+        if os.environ.get("0SYS_DEBUG_STATS"):
+            import sys as _sys
+
+            print(f"[0sys-debug] status={status_text} stats={stats!r}", file=_sys.stderr)
+
         if success:
             return TaskResult(
                 status=TaskStatus.SUCCESS,
                 message=f"ansible run {status_text}",
                 stdout=stdout,
                 stderr=stderr,
-                changed=self._was_changed(stats),
+                changed=self._was_changed(stats, stdout),
                 duration_ms=duration_ms,
             )
 
@@ -129,15 +138,28 @@ class AnsibleBackend(Backend):
             duration_ms=duration_ms,
         )
 
-    def _was_changed(self, stats: dict[str, object]) -> bool:
+    def _was_changed(self, stats: dict[str, object], stdout: str = "") -> bool:
+        if stdout:
+            matches = _RECAP_CHANGED_RE.findall(stdout)
+            if matches:
+                return sum(int(m) for m in matches) > 0
+
         if not stats:
-            return True
-        for host_stats in stats.values():
-            if not isinstance(host_stats, dict):
+            return False
+
+        top = stats.get("changed")
+        if isinstance(top, int):
+            return top > 0
+        if isinstance(top, dict):
+            return any(isinstance(v, int) and v > 0 for v in top.values())
+
+        for value in stats.values():
+            if not isinstance(value, dict):
                 continue
-            changed = host_stats.get("changed", 0)
+            changed = value.get("changed")
             if isinstance(changed, int) and changed > 0:
                 return True
+
         return False
 
     def check(self, task: Task, context: BackendContext) -> TaskResult:

@@ -6,14 +6,25 @@
       systems only. Detected os_family: {{ ansible_facts['os_family'] }}.
   when: ansible_facts['os_family'] not in ["Debian", "RedHat"]
 
-- name: Install firewall packages
+- name: Update apt cache (Debian)
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: Update dnf cache (RedHat)
+  ansible.builtin.dnf:
+    update_cache: true
+  when: ansible_facts['os_family'] == "RedHat"
+
+- name: Install ufw (Debian)
   ansible.builtin.package:
     name:
       - ufw
     state: present
   when: ansible_facts['os_family'] == "Debian"
 
-- name: Install firewall packages
+- name: Install firewalld (RedHat)
   ansible.builtin.package:
     name:
       - firewalld
@@ -36,7 +47,7 @@
     - ansible_facts['os_family'] == "Debian"
     - firewall_default == "allow"
 
-- name: Allow listed ports
+- name: Allow listed ports (Debian)
   community.general.ufw:
     rule: allow
     port: "{{ item }}"
@@ -44,12 +55,12 @@
   loop: "{{ firewall_allow }}"
   when: ansible_facts['os_family'] == "Debian"
 
-- name: Enable ufw
+- name: Enable ufw (Debian)
   community.general.ufw:
     state: enabled
   when: ansible_facts['os_family'] == "Debian"
 
-- name: Allow listed ports
+- name: Allow listed ports (RedHat)
   ansible.posix.firewalld:
     port: "{{ item }}/tcp"
     permanent: true
@@ -58,7 +69,7 @@
   loop: "{{ firewall_allow }}"
   when: ansible_facts['os_family'] == "RedHat"
 
-- name: Enable firewalld
+- name: Enable firewalld (RedHat)
   ansible.builtin.service:
     name: firewalld
     state: started

@@ -8,7 +8,7 @@ from zerosys.backends.base import BackendContext
 from zerosys.core.config.parser import load_config
 from zerosys.core.executor.context import ExecutionContext, ExecutionOptions
 from zerosys.core.executor.executor import Executor
-from zerosys.core.executor.rollback import Rollbacker
+from zerosys.core.executor.rollback import Rollbacker, RollbackOptions
 from zerosys.core.executor.state import ExecutionState
 from zerosys.core.planner.planner import build_plan
 
@@ -52,14 +52,26 @@ def test_rollback_removes_user(ssh_target: SshTarget, tmp_path: Path) -> None:
     exists_before = ssh_target.run("id rollbackuser").returncode == 0
     assert exists_before, "user should exist after apply"
 
+    task_summary = [
+        (t.name, t.kind.value, t.result.changed if t.result else None)
+        for t in state.executed_tasks
+    ]
+    assert any(
+        t.kind.value == "user" and t.result is not None and t.result.changed
+        for t in state.executed_tasks
+    ), f"user task should report changed=True after creating user, got: {task_summary}"
+
     rollback_state = ExecutionState(total=state.total)
     for task in state.executed_tasks:
         rollback_state.register_success(task)
 
-    report = Rollbacker(context, rollback_state).rollback()
+    report = Rollbacker(context, rollback_state, RollbackOptions(aggressive=True)).rollback()
 
     assert report.failed == 0
-    assert report.successful >= 1
+    assert report.successful >= 1, (
+        f"expected at least one successful rollback, "
+        f"got skipped={report.skipped} not_reversible={report.not_reversible}"
+    )
 
     exists_after = ssh_target.run("id rollbackuser").returncode == 0
     assert not exists_after, "user should be removed after rollback"
