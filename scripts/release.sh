@@ -29,6 +29,18 @@ sed -i.bak "s/^__version_info__ = .*/__version_info__ = ($(echo "${VERSION}" | s
 sed -i.bak "s/^version = .*/version = \"${VERSION}\"/" pyproject.toml
 rm -f src/zerosys/version.py.bak pyproject.toml.bak
 
+color_info "Installing build dependencies"
+python -m pip install --upgrade build twine
+
+color_info "Building sdist and wheel"
+rm -rf dist/
+python -m build
+
+color_info "Checking package with twine"
+twine check dist/*
+
+color_ok "Build successful and ready for PyPI"
+
 color_info "Committing version bump"
 git add src/zerosys/version.py pyproject.toml
 git commit -m "chore: release v${VERSION}"
