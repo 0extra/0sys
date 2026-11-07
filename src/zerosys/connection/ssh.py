@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from zerosys.core.errors import ZeroSysError
-from zerosys.core.security.ssh import check_private_key_permissions
 
 DEFAULT_TIMEOUT = 600
 SSH_PORT_DEFAULT = 22
@@ -139,12 +138,6 @@ class SshConnection:
 
         if completed.returncode != 0:
             raise ConnectionError(f"scp failed: {completed.stderr.strip()}")
-
-    def check_key_permissions(self) -> bool:
-        if self.key_file is None:
-            return True
-        result = check_private_key_permissions(self.key_file)
-        return bool(result)
 
     def close(self) -> None:
         return None

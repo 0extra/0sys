@@ -54,7 +54,6 @@ class Task(BaseModel):
     description: str = ""
     explain: str = ""
     idempotent: bool = True
-    critical: bool = True
     status: TaskStatus = TaskStatus.PENDING
     result: TaskResult | None = None
     started_at: datetime | None = None
@@ -89,8 +88,3 @@ class Task(BaseModel):
             return 0
         delta = self.finished_at - self.started_at
         return int(delta.total_seconds() * 1000)
-
-    def short_label(self) -> str:
-        if self.target:
-            return f"{self.kind.value}:{self.target}"
-        return f"{self.kind.value}:{self.name}"

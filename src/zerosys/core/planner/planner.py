@@ -278,7 +278,6 @@ class Planner:
             ),
             params=params,
             idempotent=True,
-            critical=True,
         )
 
     def _make_command_tasks(self, config: Config) -> list[Task]:

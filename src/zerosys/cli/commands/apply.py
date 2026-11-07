@@ -142,15 +142,13 @@ def _apply_impl(
             console.print("[muted]Aborted by user.[/muted]")
             raise typer.Exit(code=0)
 
+    config_hash = _hash_text(raw_text)
+
     options = ExecutionOptions(
         dry_run=dry_run,
         verbose=verbose,
         stop_on_failure=stop_on_failure,
-        rollback_on_failure=rollback,
         tags=[t.strip() for t in tags.split(",") if t.strip()] if tags else [],
-        state_path=state_path,
-        config_path=config,
-        config_hash=_hash_text(raw_text),
     )
 
     backend_context = BackendContext(
@@ -173,7 +171,7 @@ def _apply_impl(
             store = StateStore(state_path or _default_state_path())
             run_record = RunRecord(
                 config_path=str(config.resolve()),
-                config_hash=options.config_hash,
+                config_hash=config_hash,
                 target_host=host,
                 target_user=user,
                 total_tasks=plan.size(),

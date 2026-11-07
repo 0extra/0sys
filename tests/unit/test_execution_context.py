@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from zerosys.backends.base import BackendContext
@@ -31,25 +29,16 @@ def test_default_execution_options() -> None:
     assert options.dry_run is False
     assert options.verbose is False
     assert options.stop_on_failure is True
-    assert options.rollback_on_failure is False
-    assert options.parallel is False
-    assert options.max_workers == 4
     assert options.tags == []
-    assert options.state_path is None
-    assert options.config_path is None
-    assert options.config_hash is None
 
 
-def test_execution_context_exposes_options(
-    tmp_path: Path,
-) -> None:
+def test_execution_context_exposes_options() -> None:
     plan = build_plan(_config())
     backend_context = BackendContext(target_host="localhost")
     options = ExecutionOptions(
         dry_run=True,
         verbose=True,
         tags=["server"],
-        config_path=tmp_path / "0sys.yaml",
     )
     context = ExecutionContext(
         plan=plan,

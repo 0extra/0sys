@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
 from typing import Any
-
-from zerosys.utils.text import mask_secret
 
 SENSITIVE_KEYS: frozenset[str] = frozenset(
     {
@@ -17,29 +14,19 @@ SENSITIVE_KEYS: frozenset[str] = frozenset(
         "access_key",
         "private_key",
         "privatekey",
-        "ssh_key",
         "passphrase",
     }
 )
 
 _SECRETS_REGEX = re.compile(
-    r"(?i)(\b(?:password|passwd|secret|token|api_key|apikey|access_key|private_key|privatekey|ssh_key|passphrase)\b\s*[:=]\s*[\"']?)([^\"'\s]+)([\"']?)"
+    r"(?i)(\b(?:password|passwd|secret|token|api_key|apikey|access_key|private_key|privatekey|passphrase)\b\s*[:=]\s*[\"']?)([^\"'\s]+)([\"']?)"
 )
 
 
-@dataclass
-class Secret:
-    name: str
-    value: str
-    reveal: bool = False
-
-    def __str__(self) -> str:
-        if self.reveal:
-            return self.value
-        return mask_secret(self.value)
-
-    def __repr__(self) -> str:
-        return f"Secret(name={self.name!r}, value={str(self)!r})"
+def mask_secret(value: str, visible: int = 4) -> str:
+    if len(value) <= visible:
+        return "*" * len(value)
+    return value[:visible] + "*" * (len(value) - visible)
 
 
 def _normalize_key(key: str) -> str:
@@ -84,32 +71,3 @@ def redact_text(text: str) -> str:
         return f"{prefix}{mask_secret(value)}{suffix}"
 
     return _SECRETS_REGEX.sub(_replace, text)
-
-
-@dataclass
-class SecretStore:
-    _items: dict[str, Secret] = field(default_factory=dict)
-
-    def set(self, name: str, value: str) -> None:
-        self._items[name] = Secret(name=name, value=value)
-
-    def get(self, name: str, reveal: bool = False) -> str | None:
-        entry = self._items.get(name)
-        if entry is None:
-            return None
-        return entry.value if reveal else str(entry)
-
-    def has(self, name: str) -> bool:
-        return name in self._items
-
-    def remove(self, name: str) -> bool:
-        return self._items.pop(name, None) is not None
-
-    def clear(self) -> None:
-        self._items.clear()
-
-    def names(self) -> list[str]:
-        return sorted(self._items.keys())
-
-    def __len__(self) -> int:
-        return len(self._items)

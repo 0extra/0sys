@@ -53,8 +53,7 @@ def test_rollback_removes_user(ssh_target: SshTarget, tmp_path: Path) -> None:
     assert exists_before, "user should exist after apply"
 
     task_summary = [
-        (t.name, t.kind.value, t.result.changed if t.result else None)
-        for t in state.executed_tasks
+        (t.name, t.kind.value, t.result.changed if t.result else None) for t in state.executed_tasks
     ]
     assert any(
         t.kind.value == "user" and t.result is not None and t.result.changed
